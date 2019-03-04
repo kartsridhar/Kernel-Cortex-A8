@@ -58,6 +58,11 @@ lolevel_handler_svc: sub   lr, lr, #0              @ correct return address
     
     /**/             stmdb sp!, { r0, lr}          @ store USR PC and CPSR
     /**/             mov   r0, sp                  @ set    high-level C function arg. = SP
+    
+    @ From lab-3_q (dont know why we do this)
+    /**/             ldr   r1, [ lr, #-4]          @ load    SVC instruction
+    /**/             bic   r1, r1, #0xFF000000     @ set    high-level C function arg. = SVC immediate
+                    
                      bl    hilevel_handler_svc     @ invoke high-level C function
 
     /**/             ldmia sp!, { r0, lr }         @ load  USR mode PC and CPSR
