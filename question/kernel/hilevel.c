@@ -40,24 +40,16 @@ void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
 }
 
 void schedule( ctx_t* ctx ) {
-  if     ( current->pid == pcb[ 0 ].pid ) {
-    dispatch( ctx, &pcb[ 0 ], &pcb[ 1 ] );      // context switch P_3 -> P_4
 
-    pcb[ 0 ].status = STATUS_READY;             // update   execution status  of P_3
-    pcb[ 1 ].status = STATUS_EXECUTING;         // update   execution status  of P_4
-  }
-  else if( current->pid == pcb[ 1 ].pid ) {
-    dispatch( ctx, &pcb[ 1 ], &pcb[ 2 ] );      // context switch P_4 -> P_5
-
-    pcb[ 1 ].status = STATUS_READY;             // update   execution status  of P_4
-    pcb[ 2 ].status = STATUS_EXECUTING;         // update   execution status  of P_5
-  }
-  else if ( current->pid == pcb[ 2 ].pid ) {
-    dispatch( ctx, &pcb[ 2 ], &pcb[ 0 ] );      // context switch P_5 -> P_3
-
-    pcb[ 2 ].status = STATUS_READY;             // update   execution status  of P_5
-    pcb[ 0 ].status = STATUS_EXECUTING;         // update   execution status  of P_3
-  }
+     for ( size_t i = 0; i < N; i++ ) {
+         if ( current->pid == pcb[ i ].pid ) {
+             int next = ( i + 1 ) % N;
+             dispatch( ctx, &pcb[ i ], &pcb[ next ]);   // context switch P_i -> P_( i + 1)
+             pcb[ i ].status = STATUS_READY;            // update execution status of P_i
+             pcb[ next ].status = STATUS_EXECUTING;     // update execution status of P_( i + 1)
+             return;
+         } 
+     }
 
   return;
 }
@@ -66,15 +58,11 @@ extern void     main_P3();
 extern uint32_t tos_P3;
 extern void     main_P4();
 extern uint32_t tos_P4;
-
-// to test N processes
-extern void     main_P5();
+extern void     main_P5();                      // to test for N processes
 extern uint32_t tos_P5;
 //-------------------------------------------------------------------------------
 
 void hilevel_handler_rst( ctx_t* ctx ) {
-      
-//       PL011_putc( UART0, 'X', true);
     
       // Initialise 2 PCBs = User Processes (from lab-3_q)
       memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise 0-th PCB = P_3
@@ -128,9 +116,9 @@ void hilevel_handler_irq( ctx_t* ctx ) {
     // Step 4: handle the interrupt, then clear (or reset) the source.
 
     if( id == GIC_SOURCE_TIMER0 ) {
-//       PL011_putc( UART0, 'T', true ); 
+//    PL011_putc( UART0, 'T', true ); 
       TIMER0->Timer1IntClr = 0x01;
-/**/  schedule( ctx );   // Switch process P_3 to P_4
+/**/  schedule( ctx );   // Switch context between process control blocks
     }
 
     // Step 5: write the interrupt identifier to signal we're done.
