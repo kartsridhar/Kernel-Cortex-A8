@@ -14,6 +14,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <string.h>
 // Include functionality relating to the platform.
 
 #include   "GIC.h"
@@ -40,7 +41,7 @@ typedef struct {
 } ctx_t;
 
 typedef struct {
-     pid_t    pid;
+     pid_t    pid;           // process identifier
   status_t status;
      ctx_t    ctx;
 } pcb_t;

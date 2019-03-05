@@ -9,9 +9,12 @@
 
 //------------------------FROM lab-3_q-------------------------------------
 
-pcb_t pcb[ 2 ]; 
+#define N 3      // number of processes
+
+pcb_t pcb[ 3 ]; 
 pcb_t* current = NULL;
 
+// initially 
 void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
   char prev_pid = '?', next_pid = '?';
 
@@ -44,9 +47,15 @@ void schedule( ctx_t* ctx ) {
     pcb[ 1 ].status = STATUS_EXECUTING;         // update   execution status  of P_4
   }
   else if( current->pid == pcb[ 1 ].pid ) {
-    dispatch( ctx, &pcb[ 1 ], &pcb[ 0 ] );      // context switch P_4 -> P_3
+    dispatch( ctx, &pcb[ 1 ], &pcb[ 2 ] );      // context switch P_4 -> P_5
 
     pcb[ 1 ].status = STATUS_READY;             // update   execution status  of P_4
+    pcb[ 2 ].status = STATUS_EXECUTING;         // update   execution status  of P_5
+  }
+  else if ( current->pid == pcb[ 2 ].pid ) {
+    dispatch( ctx, &pcb[ 2 ], &pcb[ 0 ] );      // context switch P_5 -> P_3
+
+    pcb[ 2 ].status = STATUS_READY;             // update   execution status  of P_5
     pcb[ 0 ].status = STATUS_EXECUTING;         // update   execution status  of P_3
   }
 
@@ -58,6 +67,9 @@ extern uint32_t tos_P3;
 extern void     main_P4();
 extern uint32_t tos_P4;
 
+// to test N processes
+extern void     main_P5();
+extern uint32_t tos_P5;
 //-------------------------------------------------------------------------------
 
 void hilevel_handler_rst( ctx_t* ctx ) {
@@ -66,18 +78,25 @@ void hilevel_handler_rst( ctx_t* ctx ) {
     
       // Initialise 2 PCBs = User Processes (from lab-3_q)
       memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise 0-th PCB = P_3
-      pcb[ 0 ].pid      = 1;
+      pcb[ 0 ].pid      = 3;
       pcb[ 0 ].status   = STATUS_CREATED;
       pcb[ 0 ].ctx.cpsr = 0x50;                    // processor is switched into USR mode
       pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_P3 );
       pcb[ 0 ].ctx.sp   = ( uint32_t )( &tos_P3  );
 
       memset( &pcb[ 1 ], 0, sizeof( pcb_t ) );     // initialise 1-st PCB = P_4
-      pcb[ 1 ].pid      = 2;
+      pcb[ 1 ].pid      = 4;
       pcb[ 1 ].status   = STATUS_CREATED;
       pcb[ 1 ].ctx.cpsr = 0x50;
       pcb[ 1 ].ctx.pc   = ( uint32_t )( &main_P4 );
       pcb[ 1 ].ctx.sp   = ( uint32_t )( &tos_P4  );
+    
+      memset( &pcb[ 2 ], 0, sizeof( pcb_t ) );     // initialise 2-nd PCB = P_5
+      pcb[ 2 ].pid      = 5;
+      pcb[ 2 ].status   = STATUS_CREATED;
+      pcb[ 2 ].ctx.cpsr = 0x50;
+      pcb[ 2 ].ctx.pc   = ( uint32_t )( &main_P5 );
+      pcb[ 2 ].ctx.sp   = ( uint32_t )( &tos_P5  );
     
       // Execute the 0th PCB chosen at random
       dispatch( ctx, NULL, &pcb[ 0 ] );
@@ -109,7 +128,7 @@ void hilevel_handler_irq( ctx_t* ctx ) {
     // Step 4: handle the interrupt, then clear (or reset) the source.
 
     if( id == GIC_SOURCE_TIMER0 ) {
-      PL011_putc( UART0, 'T', true ); 
+//       PL011_putc( UART0, 'T', true ); 
       TIMER0->Timer1IntClr = 0x01;
 /**/  schedule( ctx );   // Switch process P_3 to P_4
     }

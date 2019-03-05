@@ -30,5 +30,10 @@ SECTIONS {
   /* allocate stack for P4           */
   .       = . + 0x00001000;  
   tos_P4  = .;
+  
+  /* To test n processes             */
+  /* allocate stack for P5           */
+  .       = . + 0x00001000;  
+  tos_P5  = .;
 }
 
