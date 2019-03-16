@@ -11,8 +11,9 @@
 
 #define N 3      // number of processes
 
-pcb_t pcb[ 3 ]; 
-pcb_t* current = NULL;
+pcb_t pcb[ N ]; 
+pcb_t* current;
+int count;
 
 // initially 
 void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
@@ -39,19 +40,40 @@ void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
   return;
 }
 
+// Function to choose the next availaible process 
+void findMaxPriority() {
+    int maxPriority = 0;              // set to the highest priority of the process 
+    current->age = -1;
+    for ( int i = 0; i < count; i++ ) {       // iterating through processors to find process with highest priority
+        pcb[ i ].age += 1;              // incrementing every process by 1 and resetting the age of the current process to 0
+        int priority = pcb[ i ].age + pcb[ i ].priority;      // priority =  age + old priority
+        
+        if ( priority > maxPriority ) {
+            priority = maxPriority;
+            current = &pcb[ i ];     // setting the current process to the new process
+        }
+    }
+}
+
+/* Scheduler function (algorithm). Currently special purpose for 3 user
+programs. It checks which process is active, and performs a context
+switch to suspend it and resume the next one in a simple round-robin
+scheduling. 'Memcpy' is used to copy the associated execution contexts
+into place, before updating 'current' to refelct new active PCB.
+*/
+
 void schedule( ctx_t* ctx ) {
-
-     for ( size_t i = 0; i < N; i++ ) {
-         if ( current->pid == pcb[ i ].pid ) {
-             int next = ( i + 1 ) % N;
-             dispatch( ctx, &pcb[ i ], &pcb[ next ]);   // context switch P_i -> P_( i + 1)
-             pcb[ i ].status = STATUS_READY;            // update execution status of P_i
-             pcb[ next ].status = STATUS_EXECUTING;     // update execution status of P_( i + 1)
-             return;
-         } 
-     }
-
-  return;
+    for ( size_t i = 0; i < N; i++ ) {
+        if ( current->pid == pcb[ i ].pid) {
+            int next = ( i + 1 ) % N;
+            findMaxPriority();
+            dispatch( ctx, &pcb[ i ], &pcb[ next ]);
+            pcb[ i ].status = STATUS_READY;
+            pcb[ next ].status = STATUS_EXECUTING;
+            break;
+        }
+    }
+    return;
 }
 
 extern void     main_P3();
@@ -64,6 +86,7 @@ extern uint32_t tos_P5;
 
 void hilevel_handler_rst( ctx_t* ctx ) {
     
+//       PL011_putc( UART0, 'R', true ); 
       // Initialise 2 PCBs = User Processes (from lab-3_q)
       memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise 0-th PCB = P_3
       pcb[ 0 ].pid      = 3;
@@ -71,6 +94,7 @@ void hilevel_handler_rst( ctx_t* ctx ) {
       pcb[ 0 ].ctx.cpsr = 0x50;                    // processor is switched into USR mode
       pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_P3 );
       pcb[ 0 ].ctx.sp   = ( uint32_t )( &tos_P3  );
+      pcb[ 0 ].priority = 0;
 
       memset( &pcb[ 1 ], 0, sizeof( pcb_t ) );     // initialise 1-st PCB = P_4
       pcb[ 1 ].pid      = 4;
@@ -78,6 +102,7 @@ void hilevel_handler_rst( ctx_t* ctx ) {
       pcb[ 1 ].ctx.cpsr = 0x50;
       pcb[ 1 ].ctx.pc   = ( uint32_t )( &main_P4 );
       pcb[ 1 ].ctx.sp   = ( uint32_t )( &tos_P4  );
+      pcb[ 1 ].priority = 0;
     
       memset( &pcb[ 2 ], 0, sizeof( pcb_t ) );     // initialise 2-nd PCB = P_5
       pcb[ 2 ].pid      = 5;
@@ -85,9 +110,12 @@ void hilevel_handler_rst( ctx_t* ctx ) {
       pcb[ 2 ].ctx.cpsr = 0x50;
       pcb[ 2 ].ctx.pc   = ( uint32_t )( &main_P5 );
       pcb[ 2 ].ctx.sp   = ( uint32_t )( &tos_P5  );
+      pcb[ 2 ].priority = 0;
     
       // Execute the 0th PCB chosen at random
-      dispatch( ctx, NULL, &pcb[ 0 ] );
+      dispatch( ctx, current, &pcb[ 0 ] );
+      count = 3;
+      pcb[ 0 ].status = STATUS_EXECUTING;
     
       // Configuring the timer interrupt (from lab-4_q)
       TIMER0->Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
