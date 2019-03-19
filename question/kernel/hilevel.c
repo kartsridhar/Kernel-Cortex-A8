@@ -9,11 +9,11 @@
 
 //------------------------FROM lab-3_q-------------------------------------
 
-#define N 3      // number of processes
+#define N 1      // number of processes
 
 pcb_t pcb[ N ]; 
 pcb_t* current = NULL;
-size_t count = 3;
+size_t count = 1;
 
 // Function to create a new process identifier
 pid_t newPid() {
@@ -32,21 +32,27 @@ pid_t newPid() {
 }
 
 // Function to create a new process control block 
-pcb_t* newProcess( uint32_t sp, uint32_t pc ) {
+pcb_t* newProcess( pid_t id, uint32_t sp, uint32_t pc, pid_t priority ) {
     count += 1;
     pcb_t *newProcess = &pcb[ count ];
     memset( newProcess, 0, sizeof( pcb_t ) );
-    newProcess->pid = newPid();
+    newProcess->pid = id;
     newProcess->status = STATUS_CREATED;
     newProcess->ctx.cpsr = 0x50;
     newProcess->ctx.pc = pc;
     newProcess->ctx.sp = sp;
-    newProcess->priority = 0;
-    
+    newProcess->priority = priority;
+    newProcess->changed_priority = newProcess->priority;          // initialising changed priority to initial priority
+    newProcess->incPriority = id * 2;              // initialising priority increment as twice the pid, for simplicity
+
     return newProcess;
 }
 
-// Function to choose the next availaible process 
+// Function to choose the process with highest priority
+// Priority = initial priority + the change in priority
+// Reset the current process' changed priority to the original priority
+// Increase the changed priority of every process by the increment priority value
+// returns the index of the process with highest priority  
 int findMaxPriority() {
     int maxPriority = 0;              // set to the highest priority of the process 
     int temp;
@@ -108,12 +114,6 @@ void schedule( ctx_t* ctx ) {
     return;
 }
 
-extern void     main_P3();
-extern uint32_t tos_P3;
-extern void     main_P4();
-extern uint32_t tos_P4;
-extern void     main_P5();                   
-extern uint32_t tos_P5;
 extern void     main_console();
 extern uint32_t tos_console;
 
@@ -121,58 +121,36 @@ extern uint32_t tos_console;
 
 void hilevel_handler_rst( ctx_t* ctx ) {
     
-//       PL011_putc( UART0, 'R', true ); 
-//       Initialise 2 PCBs = User Processes (from lab-3_q)
-      memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise 0-th PCB = P_3
-      pcb[ 0 ].pid      = 3;
-      pcb[ 0 ].status   = STATUS_CREATED;
-      pcb[ 0 ].ctx.cpsr = 0x50;                    // processor is switched into USR mode
-      pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_P3 );
-      pcb[ 0 ].ctx.sp   = ( uint32_t )( &tos_P3  );
-      pcb[ 0 ].priority = 5;
-      pcb[ 0 ].changed_priority = 5;
-      pcb[ 0 ].incPriority = 3;
+    // Configuring the timer interrupt (from lab-4_q)
+	TIMER0->Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
+	TIMER0->Timer1Ctrl  = 0x00000002; // select 32-bit   timer
+	TIMER0->Timer1Ctrl |= 0x00000040; // select periodic timer
+	TIMER0->Timer1Ctrl |= 0x00000020; // enable          timer interrupt
+	TIMER0->Timer1Ctrl |= 0x00000080; // enable          timer
 
-      memset( &pcb[ 1 ], 0, sizeof( pcb_t ) );     // initialise 1-st PCB = P_4
-      pcb[ 1 ].pid      = 4;
-      pcb[ 1 ].status   = STATUS_CREATED;
-      pcb[ 1 ].ctx.cpsr = 0x50;
-      pcb[ 1 ].ctx.pc   = ( uint32_t )( &main_P4 );
-      pcb[ 1 ].ctx.sp   = ( uint32_t )( &tos_P4  );
-      pcb[ 1 ].priority = 6;
-      pcb[ 1 ].changed_priority = 6;
-      pcb[ 1 ].incPriority = 4;
+	GICC0->PMR          = 0x000000F0; // unmask all            interrupts
+	GICD0->ISENABLER1  |= 0x00000010; // enable timer          interrupt
+	GICC0->CTLR         = 0x00000001; // enable GIC interface
+	GICD0->CTLR         = 0x00000001; // enable GIC distributor
+	
+	PL011_putc( UART0, 'R',      true );
     
-      memset( &pcb[ 2 ], 0, sizeof( pcb_t ) );     // initialise 2-nd PCB = P_5
-      pcb[ 2 ].pid      = 5;
-      pcb[ 2 ].status   = STATUS_CREATED;
-      pcb[ 2 ].ctx.cpsr = 0x50;
-      pcb[ 2 ].ctx.pc   = ( uint32_t )( &main_P5 );
-      pcb[ 2 ].ctx.sp   = ( uint32_t )( &tos_P5  );
-      pcb[ 2 ].priority = 7;
-      pcb[ 2 ].changed_priority = 7;
-      pcb[ 2 ].incPriority = 5;
-    
-//       pcb_t *console = newProcess( main_console, tos_console );
-//       dispatch( ctx, current, &console->ctx );
-      dispatch( ctx, current, &pcb[ findMaxPriority() ] );
-      
-      // Configuring the timer interrupt (from lab-4_q)
-      TIMER0->Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
-      TIMER0->Timer1Ctrl  = 0x00000002; // select 32-bit   timer
-      TIMER0->Timer1Ctrl |= 0x00000040; // select periodic timer
-      TIMER0->Timer1Ctrl |= 0x00000020; // enable          timer interrupt
-      TIMER0->Timer1Ctrl |= 0x00000080; // enable          timer
+	memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise 0-th PCB = P_3
+	pcb[ 0 ].pid      = 3;
+	pcb[ 0 ].status   = STATUS_CREATED;
+	pcb[ 0 ].ctx.cpsr = 0x50;                    // processor is switched into USR mode
+	pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_console );
+	pcb[ 0 ].ctx.sp   = ( uint32_t )( &tos_console );
+	pcb[ 0 ].priority = 5;
+	pcb[ 0 ].changed_priority = 5;
+	pcb[ 0 ].incPriority = 3;
+	
+	dispatch( ctx, current, &pcb[ 0 ] );
+	
+	// Enabling the IRQ interrupt
+	int_enable_irq();
 
-      GICC0->PMR          = 0x000000F0; // unmask all            interrupts
-      GICD0->ISENABLER1  |= 0x00000010; // enable timer          interrupt
-      GICC0->CTLR         = 0x00000001; // enable GIC interface
-      GICD0->CTLR         = 0x00000001; // enable GIC distributor
-      
-      // Enabling the IRQ interrupt
-      int_enable_irq();
-      
-      return;
+	return;
 }
 
 // From lab-4_q
@@ -184,7 +162,6 @@ void hilevel_handler_irq( ctx_t* ctx ) {
     // Step 4: handle the interrupt, then clear (or reset) the source.
 
     if( id == GIC_SOURCE_TIMER0 ) {
-//    PL011_putc( UART0, 'T', true ); 
       TIMER0->Timer1IntClr = 0x01;
       schedule( ctx );   // Switch context between process control blocks
     }
@@ -205,27 +182,47 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
    * - write any return value back to preserved usr mode registers.
    */
     switch( id ) {
-        case 0x00 : { // 0x00 => yield()
-          schedule( ctx );
-          break;
+        case 0x00 : { // 0x00 => yield() = timer forcibly transfer the control to another process. 
+			schedule( ctx );
+			break;
         }
 
         case 0x01 : { // 0x01 => write( fd, x, n )
-          int   fd = ( int   )( ctx->gpr[ 0 ] );
-          char*  x = ( char* )( ctx->gpr[ 1 ] );
-          int    n = ( int   )( ctx->gpr[ 2 ] );
+			int   fd = ( int   )( ctx->gpr[ 0 ] );     // file descriptor
+			char*  x = ( char* )( ctx->gpr[ 1 ] );
+			int    n = ( int   )( ctx->gpr[ 2 ] );
 
-          for( int i = 0; i < n; i++ ) {
-            PL011_putc( UART0, *x++, true );
-          }
+			for( int i = 0; i < n; i++ ) {
+				PL011_putc( UART0, *x++, true );
+			}
 
-          ctx->gpr[ 0 ] = n;
+			ctx->gpr[ 0 ] = n;
 
-          break;
+			break;
         }
+		
+		case 0x02 : { // 0x02 => read( fd, x, n )
+			break;
+		}
+		
+		case 0x03 : { // 0x03 => fork()
+			pid_t _id_ = newPid();
+			uint32_t _sp_ = ( ( _id_ + 1 ) * 0x00001000 );
+			uint32_t _pc_ = ( ( uint32_t )( &main_console ) );
+			pcb_t *new = newProcess( _id_, _sp_, _pc_, 5 );
+            break;
+		}
+			
+		case 0x04 : { // 0x04 => exit()
+			break;
+		}
+		
+		case 0x05 : { // 0x05 => exec()
+			
+		}
 
         default   : { // 0x?? => unknown/unsupported
-          break;
+			break;
         }
     }
     return;
