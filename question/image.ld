@@ -22,7 +22,6 @@ SECTIONS {
   /* allocate stack for svc mode     */
   .       = . + 0x00001000;  
   tos_svc = .;
-  
   /* FROM lab-3_q                    */
   /* allocate stack for P3           */
   .       = . + 0x00001000;  
@@ -35,5 +34,8 @@ SECTIONS {
   /* allocate stack for P5           */
   .       = . + 0x00001000;  
   tos_P5  = .;
+  /* allocate stack for console      */
+  .       = . + 0x00001000;
+  tos_console = .;
 }
 

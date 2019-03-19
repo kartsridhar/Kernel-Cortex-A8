@@ -12,8 +12,58 @@
 #define N 3      // number of processes
 
 pcb_t pcb[ N ]; 
-pcb_t* current;
-int count;
+pcb_t* current = NULL;
+size_t count = 3;
+
+// Function to create a new process identifier
+pid_t newPid() {
+    for ( pid_t p = 1; p < N; p++ ) {
+        bool check = false;       // to check if pid exists
+        for ( size_t i = 0; i < count; i++ ) {
+            if ( p == pcb[ i ].pid ) {
+                check = true;     // exists.
+                break;
+            }
+        }
+        if ( check == false )
+            return p;
+    }
+    return -1;
+}
+
+// Function to create a new process control block 
+pcb_t* newProcess( uint32_t sp, uint32_t pc ) {
+    count += 1;
+    pcb_t *newProcess = &pcb[ count ];
+    memset( newProcess, 0, sizeof( pcb_t ) );
+    newProcess->pid = newPid();
+    newProcess->status = STATUS_CREATED;
+    newProcess->ctx.cpsr = 0x50;
+    newProcess->ctx.pc = pc;
+    newProcess->ctx.sp = sp;
+    newProcess->priority = 0;
+    
+    return newProcess;
+}
+
+// Function to choose the next availaible process 
+int findMaxPriority() {
+    int maxPriority = 0;              // set to the highest priority of the process 
+    int temp;
+    current->changed_priority = current->priority;
+    for ( size_t i = 0; i < count; i++ ) {       // iterating through processors to find process with highest priority
+        if ( pcb[ i ].pid != current->pid ) {
+            pcb[ i ].changed_priority += pcb[ i ].incPriority;                 // incrementing every process by 1 and resetting the age of the current process to 0
+            int priority = pcb[ i ].changed_priority + pcb[ i ].priority;      // priority =  changed priority + old priority
+
+            if ( maxPriority < priority ) {
+                maxPriority = priority;
+                temp = i;
+            }
+        }
+    }
+    return temp;
+}
 
 // initially 
 void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
@@ -40,21 +90,6 @@ void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
   return;
 }
 
-// Function to choose the next availaible process 
-void findMaxPriority() {
-    int maxPriority = 0;              // set to the highest priority of the process 
-    current->age = -1;
-    for ( int i = 0; i < count; i++ ) {       // iterating through processors to find process with highest priority
-        pcb[ i ].age += 1;              // incrementing every process by 1 and resetting the age of the current process to 0
-        int priority = pcb[ i ].age + pcb[ i ].priority;      // priority =  age + old priority
-        
-        if ( priority > maxPriority ) {
-            priority = maxPriority;
-            current = &pcb[ i ];     // setting the current process to the new process
-        }
-    }
-}
-
 /* Scheduler function (algorithm). Currently special purpose for 3 user
 programs. It checks which process is active, and performs a context
 switch to suspend it and resume the next one in a simple round-robin
@@ -63,16 +98,13 @@ into place, before updating 'current' to refelct new active PCB.
 */
 
 void schedule( ctx_t* ctx ) {
-    for ( size_t i = 0; i < N; i++ ) {
-        if ( current->pid == pcb[ i ].pid) {
-            int next = ( i + 1 ) % N;
-            findMaxPriority();
-            dispatch( ctx, &pcb[ i ], &pcb[ next ]);
-            pcb[ i ].status = STATUS_READY;
-            pcb[ next ].status = STATUS_EXECUTING;
-            break;
-        }
-    }
+            
+    int maxP = findMaxPriority();
+
+    dispatch( ctx, current, &pcb[ maxP ]);
+    current->status = STATUS_READY;
+    pcb[ maxP ].status = STATUS_EXECUTING;
+       
     return;
 }
 
@@ -80,21 +112,26 @@ extern void     main_P3();
 extern uint32_t tos_P3;
 extern void     main_P4();
 extern uint32_t tos_P4;
-extern void     main_P5();                      // to test for N processes
+extern void     main_P5();                   
 extern uint32_t tos_P5;
+extern void     main_console();
+extern uint32_t tos_console;
+
 //-------------------------------------------------------------------------------
 
 void hilevel_handler_rst( ctx_t* ctx ) {
     
 //       PL011_putc( UART0, 'R', true ); 
-      // Initialise 2 PCBs = User Processes (from lab-3_q)
+//       Initialise 2 PCBs = User Processes (from lab-3_q)
       memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise 0-th PCB = P_3
       pcb[ 0 ].pid      = 3;
       pcb[ 0 ].status   = STATUS_CREATED;
       pcb[ 0 ].ctx.cpsr = 0x50;                    // processor is switched into USR mode
       pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_P3 );
       pcb[ 0 ].ctx.sp   = ( uint32_t )( &tos_P3  );
-      pcb[ 0 ].priority = 0;
+      pcb[ 0 ].priority = 5;
+      pcb[ 0 ].changed_priority = 5;
+      pcb[ 0 ].incPriority = 3;
 
       memset( &pcb[ 1 ], 0, sizeof( pcb_t ) );     // initialise 1-st PCB = P_4
       pcb[ 1 ].pid      = 4;
@@ -102,7 +139,9 @@ void hilevel_handler_rst( ctx_t* ctx ) {
       pcb[ 1 ].ctx.cpsr = 0x50;
       pcb[ 1 ].ctx.pc   = ( uint32_t )( &main_P4 );
       pcb[ 1 ].ctx.sp   = ( uint32_t )( &tos_P4  );
-      pcb[ 1 ].priority = 0;
+      pcb[ 1 ].priority = 6;
+      pcb[ 1 ].changed_priority = 6;
+      pcb[ 1 ].incPriority = 4;
     
       memset( &pcb[ 2 ], 0, sizeof( pcb_t ) );     // initialise 2-nd PCB = P_5
       pcb[ 2 ].pid      = 5;
@@ -110,13 +149,14 @@ void hilevel_handler_rst( ctx_t* ctx ) {
       pcb[ 2 ].ctx.cpsr = 0x50;
       pcb[ 2 ].ctx.pc   = ( uint32_t )( &main_P5 );
       pcb[ 2 ].ctx.sp   = ( uint32_t )( &tos_P5  );
-      pcb[ 2 ].priority = 0;
+      pcb[ 2 ].priority = 7;
+      pcb[ 2 ].changed_priority = 7;
+      pcb[ 2 ].incPriority = 5;
     
-      // Execute the 0th PCB chosen at random
-      dispatch( ctx, current, &pcb[ 0 ] );
-      count = 3;
-      pcb[ 0 ].status = STATUS_EXECUTING;
-    
+//       pcb_t *console = newProcess( main_console, tos_console );
+//       dispatch( ctx, current, &console->ctx );
+      dispatch( ctx, current, &pcb[ findMaxPriority() ] );
+      
       // Configuring the timer interrupt (from lab-4_q)
       TIMER0->Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
       TIMER0->Timer1Ctrl  = 0x00000002; // select 32-bit   timer
@@ -146,7 +186,7 @@ void hilevel_handler_irq( ctx_t* ctx ) {
     if( id == GIC_SOURCE_TIMER0 ) {
 //    PL011_putc( UART0, 'T', true ); 
       TIMER0->Timer1IntClr = 0x01;
-/**/  schedule( ctx );   // Switch context between process control blocks
+      schedule( ctx );   // Switch context between process control blocks
     }
 
     // Step 5: write the interrupt identifier to signal we're done.
@@ -167,7 +207,6 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     switch( id ) {
         case 0x00 : { // 0x00 => yield()
           schedule( ctx );
-
           break;
         }
 
