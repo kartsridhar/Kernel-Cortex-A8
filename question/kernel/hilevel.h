@@ -41,9 +41,13 @@ typedef struct {
 } ctx_t;
 
 typedef struct {
-     pid_t    pid;           // process identifier
-  status_t status;
-     ctx_t    ctx;
+               pid_t    pid;           // process identifier
+            status_t status;
+               ctx_t    ctx;
+           bool isAvailable;
+             pid_t priority;
+     pid_t changed_priority;
+	      pid_t incPriority;        // increase priority by this val
 } pcb_t;
 
 #endif

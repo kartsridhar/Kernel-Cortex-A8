@@ -9,46 +9,22 @@
 
 //------------------------FROM lab-3_q-------------------------------------
 
-#define N 10      // number of processes
+#define N 10      // max number of processes
 
 pcb_t pcb[ N ]; 
 pcb_t* current = NULL;
-int count = 0;
+int count = 0;     // number of processes existing
+int next;          // to store the index of the next available space
 
-// Function to create a new process identifier
-pid_t newPid() {
-    for ( pid_t p = 1; p < N; p++ ) {
-        bool check = false;       // to check if pid exists
-        for ( size_t i = 0; i < count; i++ ) {
-            if ( p == pcb[ i ].pid ) {
-                check = true;     // exists.
-                break;
-            }
+int getNextAvailableSpace( ) {
+    for ( int i = 0; i < count; i++ ) {
+        if ( pcb[ i ].isAvailable ) {
+            return i;
         }
-        if ( check == false )
-            return p;
     }
     return -1;
-}
+} 
 
-// Function to create a new process control block 
-// initialising changed priority to initial priority
-// initialising priority increment as twice the pid, for simplicity
-pcb_t* newProcess( pid_t id, uint32_t sp, uint32_t pc, pid_t priority ) {
-    count += 1;
-    pcb_t *newProcess = &pcb[ count ];
-    memset( newProcess, 0, sizeof( pcb_t ) );
-    newProcess->pid = id;
-    newProcess->status = STATUS_CREATED;
-    newProcess->ctx.cpsr = 0x50;
-    newProcess->ctx.pc = pc;
-    newProcess->ctx.sp = sp;
-    newProcess->priority = priority;
-    newProcess->changed_priority = newProcess->priority;          
-    newProcess->incPriority = id * 2;              
-
-    return newProcess;
-}
 
 // Function to choose the process with highest priority
 // Priority = initial priority + the change in priority
@@ -140,22 +116,20 @@ void hilevel_handler_rst( ctx_t* ctx ) {
     PL011_putc( UART0, 'S', true );
     PL011_putc( UART0, 'E', true );
     PL011_putc( UART0, 'T', true );
-    
-    for(int i = 0; i < N; i++){
-        pcb[i].pid = -1;
-    }
-    
+
 	memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise 0-th PCB = P_3
 	pcb[ 0 ].pid      = 0;
 	pcb[ 0 ].status   = STATUS_CREATED;
 	pcb[ 0 ].ctx.cpsr = 0x50;                    // processor is switched into USR mode
 	pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_console );
 	pcb[ 0 ].ctx.sp   = ( uint32_t )( &tos_console );
-	pcb[ 0 ].priority = 5;
+    pcb[ 0 ].isAvailable = false;
+	pcb[ 0 ].priority = 10;
 	pcb[ 0 ].changed_priority = 5;
 	pcb[ 0 ].incPriority = 3;
-//     pcb* console = newProcess( newPid(), ( uint32_t )( &tos_console ), ( uint32_t )( &main_console ), 3 );
-	
+
+    count += 1;
+    
 	dispatch( ctx, NULL, &pcb[ 0 ] );
 	
 	// Enabling the IRQ interrupt
@@ -173,12 +147,12 @@ void hilevel_handler_irq( ctx_t* ctx ) {
     // Step 4: handle the interrupt, then clear (or reset) the source.
 
     if( id == GIC_SOURCE_TIMER0 ) {
-      TIMER0->Timer1IntClr = 0x01;
-      schedule( ctx );   // Switch context between process control blocks
+        schedule( ctx );   // Switch context between process control blocks
+        TIMER0->Timer1IntClr = 0x01;
     }
-
+    
     // Step 5: write the interrupt identifier to signal we're done.
-
+   
     GICC0->EOIR = id;
     return;
 }
@@ -192,7 +166,6 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
    * - perform whatever is appropriate for this system call, then
    * - write any return value back to preserved usr mode registers.
    */
-    pcb_t* new = NULL;
     switch( id ) {
         case 0x00 : { // 0x00 => yield() = timer forcibly transfer the control to another process. 
 			schedule( ctx );
@@ -218,21 +191,23 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 		}
 		
 // fork():
-//  - create new child process with unique PID,
-//  - replicate state (e.g., address space) of parent in child,
-//  - parent and child both return from fork, and continue to execute after the call point,
-//  - return value is 0 for child, and PID of child for parent.
+// 1  - create new child process with unique PID,
+// 2  - replicate state (e.g., address space) of parent in child,
+// 3  - parent and child both return from fork, and continue to execute after the call point,
+// 4  - return value is 0 for child, and PID of child for parent.
             
 		case 0x03 : { // 0x03 => fork()
-			pid_t new_id = newPid();
-			uint32_t new_sp = (ctx->sp);
-			uint32_t new_pc = ctx->pc;
-			new = newProcess( new_id, new_sp, new_pc, 5 );
-            
-            new->ctx.gpr[ 0 ] = 0;     // storing the address of the child
-            
-			ctx->gpr[ 0 ] = new_id;
-			
+            count += 1;
+            next = getNextAvailableSpace();
+            memset( &pcb[ next ], 0, sizeof( pcb_t ) );
+            pcb[ next ].pid      = next + 1;
+            pcb[ next ].status   = STATUS_CREATED;
+            pcb[ next ].ctx.cpsr = 0x50;                    // processor is switched into USR mode
+            pcb[ next ].ctx.pc   = ( uint32_t )( &main_console );
+            pcb[ next ].ctx.sp   = ( uint32_t )( &tos_console + ( next + 1 ) * 0x00001000 );
+           
+            ctx->gpr[ 0 ] = 0;
+
             break;
 		}
 			
@@ -241,10 +216,9 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 		}
 		
 		case 0x05 : { // 0x05 => exec()
-            uint32_t address = ( uint32_t ) ( ctx->gpr[ 0 ] );
-            dispatch( ctx, current, current );
-            current->ctx.pc = ( uint32_t ) ( address );
-            
+            memcpy( ctx, &pcb[ next ], sizeof( ctx_t ) );
+            ctx->pc = ctx->gpr[ 0 ];
+            dispatch( ctx, current, &pcb[ next ] );
 			break;
 		}
 
