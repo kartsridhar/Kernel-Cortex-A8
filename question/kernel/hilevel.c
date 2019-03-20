@@ -9,11 +9,11 @@
 
 //------------------------FROM lab-3_q-------------------------------------
 
-#define N 1      // number of processes
+#define N 10      // number of processes
 
 pcb_t pcb[ N ]; 
 pcb_t* current = NULL;
-size_t count = 1;
+int count = 0;
 
 // Function to create a new process identifier
 pid_t newPid() {
@@ -32,6 +32,8 @@ pid_t newPid() {
 }
 
 // Function to create a new process control block 
+// initialising changed priority to initial priority
+// initialising priority increment as twice the pid, for simplicity
 pcb_t* newProcess( pid_t id, uint32_t sp, uint32_t pc, pid_t priority ) {
     count += 1;
     pcb_t *newProcess = &pcb[ count ];
@@ -42,8 +44,8 @@ pcb_t* newProcess( pid_t id, uint32_t sp, uint32_t pc, pid_t priority ) {
     newProcess->ctx.pc = pc;
     newProcess->ctx.sp = sp;
     newProcess->priority = priority;
-    newProcess->changed_priority = newProcess->priority;          // initialising changed priority to initial priority
-    newProcess->incPriority = id * 2;              // initialising priority increment as twice the pid, for simplicity
+    newProcess->changed_priority = newProcess->priority;          
+    newProcess->incPriority = id * 2;              
 
     return newProcess;
 }
@@ -54,13 +56,13 @@ pcb_t* newProcess( pid_t id, uint32_t sp, uint32_t pc, pid_t priority ) {
 // Increase the changed priority of every process by the increment priority value
 // returns the index of the process with highest priority  
 int findMaxPriority() {
-    int maxPriority = 0;              // set to the highest priority of the process 
-    int temp;
+    int maxPriority = 0;              
+    int temp = 0;
     current->changed_priority = current->priority;
-    for ( size_t i = 0; i < count; i++ ) {       // iterating through processors to find process with highest priority
-        if ( pcb[ i ].pid != current->pid ) {
-            pcb[ i ].changed_priority += pcb[ i ].incPriority;                 // incrementing every process by 1 and resetting the age of the current process to 0
-            int priority = pcb[ i ].changed_priority + pcb[ i ].priority;      // priority =  changed priority + old priority
+    for ( int i = 0; i < count; i++ ) {       
+        if ( pcb[ i ].pid != current->pid  && pcb[i].pid != -1) {
+            pcb[ i ].changed_priority += pcb[ i ].incPriority;                 
+            int priority = pcb[ i ].changed_priority + pcb[ i ].priority;      
 
             if ( maxPriority < priority ) {
                 maxPriority = priority;
@@ -99,7 +101,7 @@ void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
 /* Scheduler function (algorithm). Currently special purpose for 3 user
 programs. It checks which process is active, and performs a context
 switch to suspend it and resume the next one in a simple round-robin
-scheduling. 'Memcpy' is used to copy the associated execution contexts
+scheduling. 'memcpy' is used to copy the associated execution contexts
 into place, before updating 'current' to refelct new active PCB.
 */
 
@@ -133,10 +135,18 @@ void hilevel_handler_rst( ctx_t* ctx ) {
 	GICC0->CTLR         = 0x00000001; // enable GIC interface
 	GICD0->CTLR         = 0x00000001; // enable GIC distributor
 	
-	PL011_putc( UART0, 'R',      true );
+	PL011_putc( UART0, 'R', true );
+    PL011_putc( UART0, 'E', true );
+    PL011_putc( UART0, 'S', true );
+    PL011_putc( UART0, 'E', true );
+    PL011_putc( UART0, 'T', true );
+    
+    for(int i = 0; i < N; i++){
+        pcb[i].pid = -1;
+    }
     
 	memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise 0-th PCB = P_3
-	pcb[ 0 ].pid      = 3;
+	pcb[ 0 ].pid      = 0;
 	pcb[ 0 ].status   = STATUS_CREATED;
 	pcb[ 0 ].ctx.cpsr = 0x50;                    // processor is switched into USR mode
 	pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_console );
@@ -144,8 +154,9 @@ void hilevel_handler_rst( ctx_t* ctx ) {
 	pcb[ 0 ].priority = 5;
 	pcb[ 0 ].changed_priority = 5;
 	pcb[ 0 ].incPriority = 3;
+//     pcb* console = newProcess( newPid(), ( uint32_t )( &tos_console ), ( uint32_t )( &main_console ), 3 );
 	
-	dispatch( ctx, current, &pcb[ 0 ] );
+	dispatch( ctx, NULL, &pcb[ 0 ] );
 	
 	// Enabling the IRQ interrupt
 	int_enable_irq();
@@ -181,6 +192,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
    * - perform whatever is appropriate for this system call, then
    * - write any return value back to preserved usr mode registers.
    */
+    pcb_t* new = NULL;
     switch( id ) {
         case 0x00 : { // 0x00 => yield() = timer forcibly transfer the control to another process. 
 			schedule( ctx );
@@ -205,11 +217,22 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 			break;
 		}
 		
+// fork():
+//  - create new child process with unique PID,
+//  - replicate state (e.g., address space) of parent in child,
+//  - parent and child both return from fork, and continue to execute after the call point,
+//  - return value is 0 for child, and PID of child for parent.
+            
 		case 0x03 : { // 0x03 => fork()
-			pid_t _id_ = newPid();
-			uint32_t _sp_ = ( ( _id_ + 1 ) * 0x00001000 );
-			uint32_t _pc_ = ( ( uint32_t )( &main_console ) );
-			pcb_t *new = newProcess( _id_, _sp_, _pc_, 5 );
+			pid_t new_id = newPid();
+			uint32_t new_sp = (ctx->sp);
+			uint32_t new_pc = ctx->pc;
+			new = newProcess( new_id, new_sp, new_pc, 5 );
+            
+            new->ctx.gpr[ 0 ] = 0;     // storing the address of the child
+            
+			ctx->gpr[ 0 ] = new_id;
+			
             break;
 		}
 			
@@ -218,7 +241,11 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 		}
 		
 		case 0x05 : { // 0x05 => exec()
-			
+            uint32_t address = ( uint32_t ) ( ctx->gpr[ 0 ] );
+            dispatch( ctx, current, current );
+            current->ctx.pc = ( uint32_t ) ( address );
+            
+			break;
 		}
 
         default   : { // 0x?? => unknown/unsupported
