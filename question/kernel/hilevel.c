@@ -116,6 +116,11 @@ void hilevel_handler_rst( ctx_t* ctx ) {
     PL011_putc( UART0, 'S', true );
     PL011_putc( UART0, 'E', true );
     PL011_putc( UART0, 'T', true );
+    
+    // Setting all processes to N to available
+    for ( int i = 0; i < N; i++ ){
+        pcb[ i ].isAvailable = true;
+    }
 
 	memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise 0-th PCB = P_3
 	pcb[ 0 ].pid      = 0;
@@ -125,7 +130,7 @@ void hilevel_handler_rst( ctx_t* ctx ) {
 	pcb[ 0 ].ctx.sp   = ( uint32_t )( &tos_console );
     pcb[ 0 ].isAvailable = false;
 	pcb[ 0 ].priority = 10;
-	pcb[ 0 ].changed_priority = 5;
+	pcb[ 0 ].changed_priority = 10;
 	pcb[ 0 ].incPriority = 3;
 
     count += 1;
@@ -197,17 +202,27 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 // 4  - return value is 0 for child, and PID of child for parent.
             
 		case 0x03 : { // 0x03 => fork()
+            
+            PL011_putc( UART0, 'F', true );
+            PL011_putc( UART0, 'O', true );
+            PL011_putc( UART0, 'R', true );
+            PL011_putc( UART0, 'K', true );
+            
             count += 1;
             next = getNextAvailableSpace();
-            memset( &pcb[ next ], 0, sizeof( pcb_t ) );
-            pcb[ next ].pid      = next + 1;
+            
+            memcpy( &pcb[ next ], &pcb[0] , sizeof( pcb_t ) );
+            pcb[ next ].pid      = next;
             pcb[ next ].status   = STATUS_CREATED;
-            pcb[ next ].ctx.cpsr = 0x50;                    // processor is switched into USR mode
-            pcb[ next ].ctx.pc   = ( uint32_t )( &main_console );
-            pcb[ next ].ctx.sp   = ( uint32_t )( &tos_console + ( next + 1 ) * 0x00001000 );
-           
-            ctx->gpr[ 0 ] = 0;
-
+            pcb[ next ].isAvailable   = false;
+            pcb[ next ].priority = 5;
+            pcb[ next ].changed_priority = 5;
+            pcb[ next ].incPriority = 1;    
+            pcb[ next ].ctx.sp   = ( uint32_t )( &tos_console + ( next ) * 0x00001000 );
+            
+            // return from fork in parent and child processes,
+            // st. their return values are
+            pcb[ next ].ctx.gpr[ 0 ] = 0;
             break;
 		}
 			
@@ -216,9 +231,12 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 		}
 		
 		case 0x05 : { // 0x05 => exec()
-            memcpy( ctx, &pcb[ next ], sizeof( ctx_t ) );
-            ctx->pc = ctx->gpr[ 0 ];
-            dispatch( ctx, current, &pcb[ next ] );
+            PL011_putc( UART0 , 'E', true);
+            PL011_putc( UART0 , 'X', true);
+            PL011_putc( UART0 , 'E', true);
+            PL011_putc( UART0 , 'C', true);
+            
+            pcb[ next ].ctx.pc = ctx->gpr[ 0 ];
 			break;
 		}
 
