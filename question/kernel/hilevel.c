@@ -36,7 +36,8 @@ int findMaxPriority() {
     int temp = 0;
     current->changed_priority = current->priority;
     for ( int i = 0; i < count; i++ ) {       
-        if ( pcb[ i ].pid != current->pid  && pcb[i].pid != -1) {
+//         current->changed_priority = current->priority;
+        if ( pcb[ i ].pid != current->pid) {
             pcb[ i ].changed_priority += pcb[ i ].incPriority;                 
             int priority = pcb[ i ].changed_priority + pcb[ i ].priority;      
 
@@ -173,7 +174,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
    */
     switch( id ) {
         case 0x00 : { // 0x00 => yield() = timer forcibly transfer the control to another process. 
-			schedule( ctx );
+// 			schedule( ctx );
 			break;
         }
 
@@ -211,7 +212,8 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             count += 1;
             next = getNextAvailableSpace();
             
-            memcpy( &pcb[ next ], &pcb[0] , sizeof( pcb_t ) );
+            memset( &pcb[ next ], 0, sizeof( pcb_t ) );
+            memcpy( &pcb[ next ], &pcb[ 0 ] , sizeof( pcb_t ) );
             pcb[ next ].pid      = next;
             pcb[ next ].status   = STATUS_CREATED;
             pcb[ next ].isAvailable   = false;
@@ -222,11 +224,21 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             
             // return from fork in parent and child processes,
             // st. their return values are
-            pcb[ next ].ctx.gpr[ 0 ] = 0;
+      
+//             ctx->gpr[ 0 ] = next;           // ---> returning pid to parent
+            pcb[ next ].ctx.gpr[ 0 ] = 0;   // ---> return 0 to the child
             break;
 		}
 			
 		case 0x04 : { // 0x04 => exit()
+            PL011_putc( UART0, 'E', true );
+            PL011_putc( UART0, 'X', true );
+            PL011_putc( UART0, 'I', true );
+            PL011_putc( UART0, 'T', true );
+            
+            current->status = STATUS_TERMINATED;
+            schedule( ctx );
+            
 			break;
 		}
 		
@@ -239,6 +251,21 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             pcb[ next ].ctx.pc = ctx->gpr[ 0 ];
 			break;
 		}
+            
+        case 0x06 : { //0x06 => kill()
+            PL011_putc( UART0, 'K', true );
+            PL011_putc( UART0, 'I', true );
+            PL011_putc( UART0, 'L', true );
+            PL011_putc( UART0, 'L', true );
+            
+            uint32_t kill = ( uint32_t ) ( ctx->gpr[ 0 ] );
+            count -= 1;
+            pcb[ kill ].isAvailable = true;
+            pcb[ kill ].status = STATUS_TERMINATED;
+            schedule( ctx );
+            
+            break;
+        }
 
         default   : { // 0x?? => unknown/unsupported
 			break;
