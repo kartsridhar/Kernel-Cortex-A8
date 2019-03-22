@@ -10,6 +10,7 @@
 //------------------------FROM lab-3_q-------------------------------------
 
 #define N 10      // max number of processes
+#define SIZE_OF_STACK 0x00001000   // defining the size of stack
 
 pcb_t pcb[ N ]; 
 pcb_t* current = NULL;
@@ -36,7 +37,7 @@ int findMaxPriority() {
     int temp = 0;
     current->changed_priority = current->priority;
     for ( int i = 0; i < count; i++ ) {       
-        if ( pcb[ i ].pid != current->pid && pcb[ i ].status != STATUS_TERMINATED ) {
+        if ( pcb[ i ].pid != current->pid && pcb[i].status != STATUS_TERMINATED) {
             pcb[ i ].changed_priority += pcb[ i ].incPriority;                 
             int priority = pcb[ i ].changed_priority + pcb[ i ].priority;      
 
@@ -212,21 +213,35 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             next = getNextAvailableSpace();
             
             memset( &pcb[ next ], 0, sizeof( pcb_t ) );
-            memcpy( &pcb[ next ], &pcb[ 0 ] , sizeof( pcb_t ) );
+            memcpy( &pcb[ next ].ctx, ctx , sizeof( ctx_t ) );
             pcb[ next ].pid      = next;
             pcb[ next ].status   = STATUS_CREATED;
             pcb[ next ].isAvailable   = false;
-            pcb[ next ].priority = 5;
-            pcb[ next ].changed_priority = 5;
-            pcb[ next ].incPriority = 1;    
-            pcb[ next ].ctx.sp   = ( uint32_t )( &tos_console + ( next ) * 0x00001000 );
+            pcb[ next ].priority = ( next * 3 );
+            pcb[ next ].changed_priority = ( next * 3 );
+            pcb[ next ].incPriority = 2;    
+            pcb[ next ].ctx.sp = ( uint32_t )( &tos_console + ( next ) * SIZE_OF_STACK );
             
-            // return from fork in parent and child processes,
-            // st. their return values are
+            uint32_t newSP = ( uint32_t ) ( &tos_console + ( current->pid ) * SIZE_OF_STACK );
+            
+            memcpy( ( void * ) pcb[ next ].ctx.sp - SIZE_OF_STACK, ( void * ) newSP - SIZE_OF_STACK, SIZE_OF_STACK );
+            
+            ctx->gpr[ 0 ] = next;           // ---> returning pid to the parent
             pcb[ next ].ctx.gpr[ 0 ] = 0;   // ---> return 0 to the child
             break;
 		}
-			
+		
+		case 0x05 : { // 0x05 => exec()
+            PL011_putc( UART0 , 'E', true);
+            PL011_putc( UART0 , 'X', true);
+            PL011_putc( UART0 , 'E', true);
+            PL011_putc( UART0 , 'C', true);
+            
+            ctx->pc = ( uint32_t ) ctx->gpr[ 0 ];
+            ctx->sp = ( uint32_t )( &tos_console + (( next ) * SIZE_OF_STACK ));
+			break;
+		}
+            			
 		case 0x04 : { // 0x04 => exit()
             PL011_putc( UART0, 'E', true );
             PL011_putc( UART0, 'X', true );
@@ -236,18 +251,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             current->status = STATUS_TERMINATED;
 			break;
 		}
-		
-		case 0x05 : { // 0x05 => exec()
-            PL011_putc( UART0 , 'E', true);
-            PL011_putc( UART0 , 'X', true);
-            PL011_putc( UART0 , 'E', true);
-            PL011_putc( UART0 , 'C', true);
-            
-            pcb[ next ].ctx.pc = ctx->gpr[ 0 ];
-			break;
-		}
-            
-        case 0x06 : { //0x06 => kill()
+        case 0x06 : { // 0x06 => kill()
             PL011_putc( UART0, 'K', true );
             PL011_putc( UART0, 'I', true );
             PL011_putc( UART0, 'L', true );

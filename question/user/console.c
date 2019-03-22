@@ -96,6 +96,7 @@ void main_console() {
       if( 0 == pid ) {
         exec( load( strtok( NULL, " " ) ) );
       }
+        
     } 
     else if( 0 == strcmp( p, "terminate" ) ) {
       pid_t pid = atoi( strtok( NULL, " " ) );
@@ -110,3 +111,4 @@ void main_console() {
 
   exit( EXIT_SUCCESS );
 }
+
