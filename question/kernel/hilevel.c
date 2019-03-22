@@ -36,8 +36,7 @@ int findMaxPriority() {
     int temp = 0;
     current->changed_priority = current->priority;
     for ( int i = 0; i < count; i++ ) {       
-//         current->changed_priority = current->priority;
-        if ( pcb[ i ].pid != current->pid) {
+        if ( pcb[ i ].pid != current->pid && pcb[ i ].status != STATUS_TERMINATED ) {
             pcb[ i ].changed_priority += pcb[ i ].incPriority;                 
             int priority = pcb[ i ].changed_priority + pcb[ i ].priority;      
 
@@ -224,8 +223,6 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             
             // return from fork in parent and child processes,
             // st. their return values are
-      
-//             ctx->gpr[ 0 ] = next;           // ---> returning pid to parent
             pcb[ next ].ctx.gpr[ 0 ] = 0;   // ---> return 0 to the child
             break;
 		}
@@ -237,8 +234,6 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             PL011_putc( UART0, 'T', true );
             
             current->status = STATUS_TERMINATED;
-            schedule( ctx );
-            
 			break;
 		}
 		
@@ -262,7 +257,6 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             count -= 1;
             pcb[ kill ].isAvailable = true;
             pcb[ kill ].status = STATUS_TERMINATED;
-            schedule( ctx );
             
             break;
         }
