@@ -11,16 +11,20 @@
 
 #define N 10                       // max number of processes
 #define SIZE_OF_STACK 0x00001000   // defining the size of stack
+#define PHILOSOPHERS 16
+#define CHANNELS PHILOSOPHERS * 2  // number of channels
 
 pcb_t pcb[ N ]; 
 pcb_t* current = NULL;
 int noOfPCB = 0;                   // number of processes existing
 int availableSpaceIndex;           // to store the index of the next available space
 
+
+
 // Function to print to console, making things easier
 void pprint( char* str ) {
     for ( int i = 0; i < strlen( str ); i++ ) {
-        PL011_putc( UART0, str[ i ], true);
+        PL011_putc( UART0, str[ i ], true );
     }
 }
 
@@ -80,7 +84,7 @@ void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
     PL011_putc( UART0, '>',      true );
     PL011_putc( UART0, next_pid, true );
     PL011_putc( UART0, ']',      true );
-
+    
     current = next;                             // update   executing index   to P_{next}
 
   return;
@@ -93,7 +97,21 @@ scheduling. 'memcpy' is used to copy the associated execution contexts
 into place, before updating 'current' to refelct new active PCB.
 */
 
-void schedule( ctx_t* ctx ) {
+void roundRobinSchedule( ctx_t* ctx ) {
+    
+    for ( int i = 0; i < noOfPCB; i++ ) {      
+        if ( current->pid == pcb[ i ].pid ) {
+            int nextProcessIndex = ( i + 1 ) % noOfPCB;
+            dispatch( ctx, &pcb[ i ], &pcb[ nextProcessIndex ] );
+            pcb[ i ].status = STATUS_READY;
+            pcb[ nextProcessIndex ].status = STATUS_EXECUTING;
+            return;
+        }
+    }
+    return;
+}
+
+void prioritySchedule( ctx_t* ctx ) {
             
     int maxP = findMaxPriority();
 
@@ -161,7 +179,10 @@ void hilevel_handler_irq( ctx_t* ctx ) {
     // Step 4: handle the interrupt, then clear (or reset) the source.
 
     if( id == GIC_SOURCE_TIMER0 ) {
-        schedule( ctx );   // Switch context between process control blocks
+        
+        // Switch context between process control blocks
+        prioritySchedule( ctx );   
+//         roundRobinSchedule( ctx ); 
         TIMER0->Timer1IntClr = 0x01;
     }
     
@@ -182,7 +203,6 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
    */
     switch( id ) {
         case 0x00 : { // 0x00 => yield() = timer forcibly transfer the control to another process. 
-// 			schedule( ctx );
 			break;
         }
 
