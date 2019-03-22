@@ -9,16 +9,23 @@
 
 //------------------------FROM lab-3_q-------------------------------------
 
-#define N 10      // max number of processes
+#define N 10                       // max number of processes
 #define SIZE_OF_STACK 0x00001000   // defining the size of stack
 
 pcb_t pcb[ N ]; 
 pcb_t* current = NULL;
-int count = 0;     // number of processes existing
-int next;          // to store the index of the next available space
+int noOfPCB = 0;                   // number of processes existing
+int availableSpaceIndex;           // to store the index of the next available space
+
+// Function to print to console, making things easier
+void pprint( char* str ) {
+    for ( int i = 0; i < strlen( str ); i++ ) {
+        PL011_putc( UART0, str[ i ], true);
+    }
+}
 
 int getNextAvailableSpace( ) {
-    for ( int i = 0; i < count; i++ ) {
+    for ( int i = 0; i < noOfPCB; i++ ) {
         if ( pcb[ i ].isAvailable ) {
             return i;
         }
@@ -35,10 +42,14 @@ int getNextAvailableSpace( ) {
 int findMaxPriority() {
     int maxPriority = 0;              
     int temp = 0;
+    
     current->changed_priority = current->priority;
-    for ( int i = 0; i < count; i++ ) {       
+    
+    for ( int i = 0; i < noOfPCB; i++ ) {       
+        
         if ( pcb[ i ].pid != current->pid && pcb[i].status != STATUS_TERMINATED) {
-            pcb[ i ].changed_priority += pcb[ i ].incPriority;                 
+            
+            pcb[ i ].changed_priority += pcb[ i ].incPriority;    
             int priority = pcb[ i ].changed_priority + pcb[ i ].priority;      
 
             if ( maxPriority < priority ) {
@@ -87,6 +98,7 @@ void schedule( ctx_t* ctx ) {
     int maxP = findMaxPriority();
 
     dispatch( ctx, current, &pcb[ maxP ]);
+    
     current->status = STATUS_READY;
     pcb[ maxP ].status = STATUS_EXECUTING;
        
@@ -112,11 +124,7 @@ void hilevel_handler_rst( ctx_t* ctx ) {
 	GICC0->CTLR         = 0x00000001; // enable GIC interface
 	GICD0->CTLR         = 0x00000001; // enable GIC distributor
 	
-	PL011_putc( UART0, 'R', true );
-    PL011_putc( UART0, 'E', true );
-    PL011_putc( UART0, 'S', true );
-    PL011_putc( UART0, 'E', true );
-    PL011_putc( UART0, 'T', true );
+    pprint("RESET");
     
     // Setting all processes to N to available
     for ( int i = 0; i < N; i++ ){
@@ -134,7 +142,7 @@ void hilevel_handler_rst( ctx_t* ctx ) {
 	pcb[ 0 ].changed_priority = 10;
 	pcb[ 0 ].incPriority = 3;
 
-    count += 1;
+    noOfPCB += 1;
     
 	dispatch( ctx, NULL, &pcb[ 0 ] );
 	
@@ -195,70 +203,66 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 		case 0x02 : { // 0x02 => read( fd, x, n )
 			break;
 		}
-		
-// fork():
-// 1  - create new child process with unique PID,
-// 2  - replicate state (e.g., address space) of parent in child,
-// 3  - parent and child both return from fork, and continue to execute after the call point,
-// 4  - return value is 0 for child, and PID of child for parent.
-            
+
 		case 0x03 : { // 0x03 => fork()
             
-            PL011_putc( UART0, 'F', true );
-            PL011_putc( UART0, 'O', true );
-            PL011_putc( UART0, 'R', true );
-            PL011_putc( UART0, 'K', true );
+            pprint("FORK");
             
-            count += 1;
-            next = getNextAvailableSpace();
+            noOfPCB += 1;
+            availableSpaceIndex = getNextAvailableSpace();
             
-            memset( &pcb[ next ], 0, sizeof( pcb_t ) );
-            memcpy( &pcb[ next ].ctx, ctx , sizeof( ctx_t ) );
-            pcb[ next ].pid      = next;
-            pcb[ next ].status   = STATUS_CREATED;
-            pcb[ next ].isAvailable   = false;
-            pcb[ next ].priority = ( next * 3 );
-            pcb[ next ].changed_priority = ( next * 3 );
-            pcb[ next ].incPriority = 2;    
-            pcb[ next ].ctx.sp = ( uint32_t )( &tos_console + ( next ) * SIZE_OF_STACK );
+            // Setting everything in the stack to 0
+            memset( &pcb[ availableSpaceIndex ], 0, sizeof( pcb_t ) );
             
+            // Copying the contents of stack into the child process
+            memcpy( &pcb[ availableSpaceIndex ].ctx, ctx , sizeof( ctx_t ) );
+            
+            // Creating a new child process with unique available PID
+            pcb[ availableSpaceIndex ].pid      = availableSpaceIndex;
+            pcb[ availableSpaceIndex ].status   = STATUS_CREATED;
+            pcb[ availableSpaceIndex ].isAvailable   = false;
+            pcb[ availableSpaceIndex ].priority = ( availableSpaceIndex * 3 );
+            pcb[ availableSpaceIndex ].changed_priority = ( availableSpaceIndex * 3 );
+            pcb[ availableSpaceIndex ].incPriority = 2;    
+            
+            // Setting the stack pointer of the child process to the required
+            pcb[ availableSpaceIndex ].ctx.sp = ( uint32_t ) ( &tos_console + ( availableSpaceIndex ) * SIZE_OF_STACK );
+            
+            // Storing the stack pointer of the current process 
             uint32_t newSP = ( uint32_t ) ( &tos_console + ( current->pid ) * SIZE_OF_STACK );
             
-            memcpy( ( void * ) pcb[ next ].ctx.sp - SIZE_OF_STACK, ( void * ) newSP - SIZE_OF_STACK, SIZE_OF_STACK );
+            // memcpy copies the stack downwards.
+            // (void *) is used to indicate src and dest are pointers
+            memcpy( ( void * ) pcb[ availableSpaceIndex ].ctx.sp - SIZE_OF_STACK, ( void * ) newSP - SIZE_OF_STACK, SIZE_OF_STACK );
             
-            ctx->gpr[ 0 ] = next;           // ---> returning pid to the parent
-            pcb[ next ].ctx.gpr[ 0 ] = 0;   // ---> return 0 to the child
+            ctx->gpr[ 0 ] = availableSpaceIndex;           // returning pid to the parent
+            pcb[ availableSpaceIndex ].ctx.gpr[ 0 ] = 0;   // return 0 to the child
             break;
 		}
 		
 		case 0x05 : { // 0x05 => exec()
-            PL011_putc( UART0 , 'E', true);
-            PL011_putc( UART0 , 'X', true);
-            PL011_putc( UART0 , 'E', true);
-            PL011_putc( UART0 , 'C', true);
+
+            pprint("EXEC");
             
-            ctx->pc = ( uint32_t ) ctx->gpr[ 0 ];
-            ctx->sp = ( uint32_t )( &tos_console + (( next ) * SIZE_OF_STACK ));
+            ctx->pc = ( uint32_t ) ctx->gpr[ 0 ];          // loading the address from fork
+            ctx->sp = ( uint32_t ) ( &tos_console + ( ( availableSpaceIndex ) * SIZE_OF_STACK ));
 			break;
 		}
             			
 		case 0x04 : { // 0x04 => exit()
-            PL011_putc( UART0, 'E', true );
-            PL011_putc( UART0, 'X', true );
-            PL011_putc( UART0, 'I', true );
-            PL011_putc( UART0, 'T', true );
             
+            pprint("EXIT");
+            
+            // Simply terminating the process 
             current->status = STATUS_TERMINATED;
 			break;
 		}
         case 0x06 : { // 0x06 => kill()
-            PL011_putc( UART0, 'K', true );
-            PL011_putc( UART0, 'I', true );
-            PL011_putc( UART0, 'L', true );
-            PL011_putc( UART0, 'L', true );
+            
+            pprint("KILL");
             
             uint32_t kill = ( uint32_t ) ( ctx->gpr[ 0 ] );
-            count -= 1;
+            noOfPCB -= 1;
             pcb[ kill ].isAvailable = true;
             pcb[ kill ].status = STATUS_TERMINATED;
             
