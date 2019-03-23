@@ -50,5 +50,12 @@ typedef struct {
 	      pid_t incPriority;        // increase priority by this val
 } pcb_t;
 
+typedef struct {
+    pid_t wt;        // write 
+    pid_t rd;        // read
+    bool isAvailable;
+    uint32_t data;
+} pipe_t;
+
 #endif
 

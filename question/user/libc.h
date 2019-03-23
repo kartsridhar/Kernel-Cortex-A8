@@ -30,24 +30,34 @@ typedef int pid_t;
  * to act as a limited model of similar concepts.
  */
 
-#define SYS_YIELD     ( 0x00 )
-#define SYS_WRITE     ( 0x01 )
-#define SYS_READ      ( 0x02 )
-#define SYS_FORK      ( 0x03 )
-#define SYS_EXIT      ( 0x04 )
-#define SYS_EXEC      ( 0x05 )
-#define SYS_KILL      ( 0x06 )
-#define SYS_NICE      ( 0x07 )
+#define SYS_YIELD       ( 0x00 )
+#define SYS_WRITE       ( 0x01 )
+#define SYS_READ        ( 0x02 )
+#define SYS_FORK        ( 0x03 )
+#define SYS_EXIT        ( 0x04 )
+#define SYS_EXEC        ( 0x05 )
+#define SYS_KILL        ( 0x06 )
+#define SYS_NICE        ( 0x07 )
 
-#define SIG_TERM      ( 0x00 )
-#define SIG_QUIT      ( 0x01 )
+// for pipelines
+#define SYS_MKFIFO      ( 0x08 )      
+#define SYS_OPEN_PIPE   ( 0x09 )      
+#define SYS_WRITE_PIPE  ( 0x0A )  
+#define SYS_READ_PIPE   ( 0x0B )
+#define SYS_CLOSE_PIPE  ( 0x0C )
+#define SYS_UNLINK_PIPE ( 0x0D )
+#define SYS_GET_PIPE    ( 0x0E )      
 
-#define EXIT_SUCCESS  ( 0 )
-#define EXIT_FAILURE  ( 1 )
 
-#define  STDIN_FILENO ( 0 )
-#define STDOUT_FILENO ( 1 )
-#define STDERR_FILENO ( 2 )
+#define SIG_TERM        ( 0x00 )
+#define SIG_QUIT        ( 0x01 )
+
+#define EXIT_SUCCESS    ( 0 )
+#define EXIT_FAILURE    ( 1 )
+ 
+#define  STDIN_FILENO   ( 0 )
+#define STDOUT_FILENO   ( 1 )
+#define STDERR_FILENO   ( 2 )
 
 // convert ASCII string x into integer r
 extern int  atoi( char* x        );
@@ -74,4 +84,28 @@ extern int  kill( pid_t pid, int x );
 // for process identified by pid, set  priority to x
 extern void nice( pid_t pid, int x );
 
+
+// FOR PIPELINES
+// allocate pipe, initialise initial and final pipe id
+extern void mkfifo( pid_t initPid, pid_t finPid );
+
+// open pipe, return pipe identifier
+extern int openPipe( pid_t initPid, pid_t finPid );
+
+// write data to pipe, block if needed
+extern void writePipe( int pipeIndex, uint32_t data );
+
+// read data from pipe, block if needed
+extern uint32_t readPipe( int pipeIndex );
+
+// close pipe 
+extern void closePipe( int pipeIndex );
+
+// unlink pipe ( deallocate it )
+extern void unlinkPipe( int pipeIndex );
+
+// get the pipe to read data from
+extern void getPipe( int writePid, int readPid );
+
 #endif
+

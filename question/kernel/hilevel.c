@@ -7,19 +7,19 @@
 
 #include "hilevel.h"
 
-//------------------------FROM lab-3_q-------------------------------------
-
-#define N 10                       // max number of processes
+#define PROCESSES 10               // max number of processes
 #define SIZE_OF_STACK 0x00001000   // defining the size of stack
 #define PHILOSOPHERS 16
-#define CHANNELS PHILOSOPHERS * 2  // number of channels
+#define PIPES 32                   // number of pipes
 
-pcb_t pcb[ N ]; 
+pcb_t pcb[ PROCESSES ]; 
 pcb_t* current = NULL;
 int noOfPCB = 0;                   // number of processes existing
 int availableSpaceIndex;           // to store the index of the next available space
 
-
+pipe_t pipe[ PIPES ];
+int noOfPipes = 0;
+int availablePipeIndex;
 
 // Function to print to console, making things easier
 void pprint( char* str ) {
@@ -28,9 +28,10 @@ void pprint( char* str ) {
     }
 }
 
-int getNextAvailableSpace( ) {
+// Function to return the index of the available space 
+int getAvailableSpace( ) {
     for ( int i = 0; i < noOfPCB; i++ ) {
-        if ( pcb[ i ].isAvailable ) {
+        if ( pcb[ i ].isAvailable || pcb[ i ].status == STATUS_TERMINATED ) {
             return i;
         }
     }
@@ -51,7 +52,7 @@ int findMaxPriority() {
     
     for ( int i = 0; i < noOfPCB; i++ ) {       
         
-        if ( pcb[ i ].pid != current->pid && pcb[i].status != STATUS_TERMINATED) {
+        if ( pcb[ i ].pid != current->pid && pcb[ i ].status != STATUS_TERMINATED ) {
             
             pcb[ i ].changed_priority += pcb[ i ].incPriority;    
             int priority = pcb[ i ].changed_priority + pcb[ i ].priority;      
@@ -60,12 +61,17 @@ int findMaxPriority() {
                 maxPriority = priority;
                 temp = i;
             }
+//             else if ( maxPriority == priority ) {
+//                 if ( pcb[ i ].changed_priority > pcb[ availableSpaceIndex ].changed_priority ) {
+//                     maxPriority = priority;
+//                     temp = i;
+//                 }
+//             }
         }
     }
     return temp;
 }
 
-// initially 
 void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
   char prev_pid = '?', next_pid = '?';
 
@@ -115,7 +121,7 @@ void prioritySchedule( ctx_t* ctx ) {
             
     int maxP = findMaxPriority();
 
-    dispatch( ctx, current, &pcb[ maxP ]);
+    dispatch( ctx, current, &pcb[ maxP ] );
     
     current->status = STATUS_READY;
     pcb[ maxP ].status = STATUS_EXECUTING;
@@ -144,23 +150,28 @@ void hilevel_handler_rst( ctx_t* ctx ) {
 	
     pprint("RESET");
     
-    // Setting all processes to N to available
-    for ( int i = 0; i < N; i++ ){
+    // Setting all processes in N to available
+    for ( int i = 0; i < PROCESSES; i++ ){
         pcb[ i ].isAvailable = true;
     }
-
-	memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise 0-th PCB = P_3
+    
+    // Setting all pipes in PIPES to available
+    for ( int i = 0; i < PIPES; i++ ) {
+        pipe[ i ].isAvailable = true;
+    }
+    
+	memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise the console
 	pcb[ 0 ].pid      = 0;
 	pcb[ 0 ].status   = STATUS_CREATED;
 	pcb[ 0 ].ctx.cpsr = 0x50;                    // processor is switched into USR mode
 	pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_console );
 	pcb[ 0 ].ctx.sp   = ( uint32_t )( &tos_console );
-    pcb[ 0 ].isAvailable = false;
+    pcb[ 0 ].isAvailable = false;                // setting the process space to be unavailable
 	pcb[ 0 ].priority = 10;
 	pcb[ 0 ].changed_priority = 10;
 	pcb[ 0 ].incPriority = 3;
 
-    noOfPCB += 1;
+    noOfPCB += 1;                                // increasing the process count by 1
     
 	dispatch( ctx, NULL, &pcb[ 0 ] );
 	
@@ -229,7 +240,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             pprint("FORK");
             
             noOfPCB += 1;
-            availableSpaceIndex = getNextAvailableSpace();
+            availableSpaceIndex = getAvailableSpace();
             
             // Setting everything in the stack to 0
             memset( &pcb[ availableSpaceIndex ], 0, sizeof( pcb_t ) );
@@ -260,15 +271,6 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             break;
 		}
 		
-		case 0x05 : { // 0x05 => exec()
-
-            pprint("EXEC");
-            
-            ctx->pc = ( uint32_t ) ctx->gpr[ 0 ];          // loading the address from fork
-            ctx->sp = ( uint32_t ) ( &tos_console + ( ( availableSpaceIndex ) * SIZE_OF_STACK ));
-			break;
-		}
-            			
 		case 0x04 : { // 0x04 => exit()
             
             pprint("EXIT");
@@ -277,6 +279,16 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             current->status = STATUS_TERMINATED;
 			break;
 		}
+        
+        case 0x05 : { // 0x05 => exec()
+
+            pprint("EXEC");
+            
+            ctx->pc = ( uint32_t ) ctx->gpr[ 0 ];          // loading the address from fork
+            ctx->sp = ( uint32_t ) ( &tos_console + ( ( availableSpaceIndex ) * SIZE_OF_STACK ));
+			break;
+		}
+            
         case 0x06 : { // 0x06 => kill()
             
             pprint("KILL");
@@ -288,11 +300,64 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             
             break;
         }
-
+        
+        // mkfifo = make FIFO (pipe) => first in first out
+        case 0x08 : { // 0x08 => mkfifo( pid_t initPid, pid_t finPid )
+            
+            pprint("INITIALISING-PIPE");
+            
+            uint32_t initPid = ( uint32_t ) ( ctx->gpr[ 0 ] );
+            uint32_t finPid  = ( uint32_t ) ( ctx->gpr[ 1 ] );
+                        
+            for ( int i = 0; i < PIPES; i++ ) {
+                if ( pipe[ i ].isAvailable ) {
+                    memset( ( void * ) ( &pipe[ i ] ) - sizeof( pipe_t ) );
+                    pipe[ i ].isAvailable = false;
+                    pipe[ i ].wt = initPid;
+                    pipe[ i ].rd = finPid;
+                    break;
+                }
+            }
+            break;
+        }
+            
+        case 0x09 : { // 0x09 => openPipe( pid_t initPid, pid_t finPid )
+            
+            pprint("OPEN-PIPE");
+            
+            uint32_t initPid = ( uint32_t ) ( ctx->gpr[ 0 ] );
+            uint32_t finPid  = ( uint32_t ) ( ctx->gpr[ 1 ] );
+            
+            int pipeID = -1;
+            
+            for ( int i = 0; i < PIPES; i++ ) {
+                if ( pipe[ i ].wt == initPid && pipe[ i ].rd == finPid ) {
+                    pipeID = i;
+                    pipe[ i ].data = 0;      // setting pipe to empty
+                    break;
+                }
+            }
+            ctx->gpr[ 0 ] = pipeID;          // returning pipe identifier
+            
+            break;
+        }
+            
+        case 0x0A : { // 0x0A => writePipe( int pipeIndex, uint32_t data )
+            
+            pprint("WRITE-PIPE");
+            
+            int pipeIndex = ( uint32_t ) ( ctx->gpr[ 0 ] );
+            uint32_t data = ( uint32_t ) ( ctx->gpr[ 1 ] );
+            pipe[ pipeIndex ].data = data;
+            
+            break;
+        }
+            
         default   : { // 0x?? => unknown/unsupported
 			break;
-        }
-    }
+        }            
+    }       
     return;
 }
+    
 
