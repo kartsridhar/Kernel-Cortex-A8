@@ -149,29 +149,17 @@ void nice( int pid, int x ) {
 }
 
 // FOR PIPELINES
-void mkfifo( pid_t initPid, pid_t finPid ) {
-    asm volatile( "mov r0, %1 \n" // assign r0 initPid
-                  "mov r1, %2 \n" // assign r1 finPid
-                  "svc %0     \n" // make system call SYS_MKFIFO
-                :
-                : "I" (SYS_MKFIFO), "r" (initPid), "r" (finPid)
-                : "r0", "r1" );
+int pipe( int end ) {
+    int r;
     
-    return;
-}
-
-int openPipe( pid_t initPid, pid_t finPid ) {
-  int r;
-
-  asm volatile( "mov r0, %2 \n" // assign r0 = initPid
-                "mov r1, %3 \n" // assign r1 =  finPid
-                "svc %1     \n" // make system call SYS_OPEN_PIPE
-                "mov %0, r0 \n" // assign r  = r0
-              : "=r" (r) 
-              : "I" (SYS_OPEN_PIPE),  "r" (initPid), "r" (finPid) 
-              : "r0", "r1", "r2" );
-
-  return r;
+    asm volatile( "mov r0, %2 \n" // assign r0 = end
+                  "svc %1     \n" // make system call SYS_PIPE
+                  "mov %0, r0 \n" // assign r0 = r
+                : "=r" (r)
+                : "I" (SYS_PIPE), "r" (end)
+                : "r0" );
+    
+    return r;
 }
 
 void writePipe( int pipeIndex, uint32_t data ) {
@@ -185,14 +173,14 @@ void writePipe( int pipeIndex, uint32_t data ) {
       return;
 }
 
-uint32_t readPipe( int pipeIndex ) {
-  uint32_t r;
+int readPipe( int start ) {
+  int r;
 
-  asm volatile( "mov r0, %2 \n" // assign r0 =  pipeIndex
+  asm volatile( "mov r0, %2 \n" // assign r0 =  start
                 "svc %1     \n" // make system call SYS_READ_PIPE
                 "mov %0, r0 \n" // assign r0 =    r
               : "=r" (r)
-              : "I" (SYS_READ_PIPE), "r" (pipeIndex)
+              : "I" (SYS_READ_PIPE), "r" (start)
               : "r0");
 
   return r;
@@ -208,27 +196,4 @@ void closePipe( int pipeIndex ) {
     return;
 }
 
-void unlinkPipe( int pipeIndex ) {
-    asm volatile( "mov r0, %1 \n" // assign r0 =  pipeIndex
-                  "svc %0     \n" // make system call SYS_UNLINK_PIPE
-                :
-                : "I" (SYS_UNLINK_PIPE), "r" (pipeIndex)
-                : "r0" );
-
-    return;
-}
-
-int getPipe( int writePid, int readPid ) {
-  int r;
-
-  asm volatile( "mov r0, %2 \n" // assign r0 =  writePid
-                "mov r1, %3 \n" // assign r1 = readPid
-                "svc %1     \n" // make system call SYS_GET_PIPE
-                "mov %0, r0 \n" // assign r0 =    r
-              : "=r" (r)
-              : "I" (SYS_GET_PIPE), "r" (writePid), "r" (readPid)
-              : "r0", "r1" );
-
-  return r;
-}
 

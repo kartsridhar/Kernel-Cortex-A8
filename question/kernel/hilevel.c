@@ -9,8 +9,7 @@
 
 #define PROCESSES 10               // max number of processes
 #define SIZE_OF_STACK 0x00001000   // defining the size of stack
-#define PHILOSOPHERS 16
-#define PIPES 32                   // number of pipes
+#define PIPES 16                   // max number of pipes
 
 pcb_t pcb[ PROCESSES ]; 
 pcb_t* current = NULL;
@@ -19,7 +18,6 @@ int availableSpaceIndex;           // to store the index of the next available s
 
 pipe_t pipe[ PIPES ];
 int noOfPipes = 0;
-int availablePipeIndex;
 
 // Function to print to console, making things easier
 void pprint( char* str ) {
@@ -38,6 +36,23 @@ int getAvailableSpace( ) {
     return -1;
 } 
 
+// Function to return the index of the available pipe 
+int getAvailablePipe() {
+    for ( int i = 0; i < PIPES; i++ ) {
+        if ( pipe[ i ].isAvailable || pcb[ i ].status == STATUS_TERMINATED )
+            return i;
+    }
+    return -1;
+}
+
+// Function to get a respective pipe by pipe ID
+int getPipeIndex( pid_t id ) {
+    for ( int i = 0; i < PIPES; i++ ) {
+        if ( id == pipe[ i ].pipeID )
+            return i;
+    }
+    return -1;
+}
 
 // Function to choose the process with highest priority
 // Priority = initial priority + the change in priority
@@ -298,57 +313,83 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             pcb[ kill ].isAvailable = true;
             pcb[ kill ].status = STATUS_TERMINATED;
             
-            break;
-        }
+            break; 
+        }    
         
-        // mkfifo = make FIFO (pipe) => first in first out
-        case 0x08 : { // 0x08 => mkfifo( pid_t initPid, pid_t finPid )
+        case 0x08 : { // 0x08 => pipe( int end )
             
-            pprint("INITIALISING-PIPE");
+            pprint("CREATING_PIPE");
             
-            uint32_t initPid = ( uint32_t ) ( ctx->gpr[ 0 ] );
-            uint32_t finPid  = ( uint32_t ) ( ctx->gpr[ 1 ] );
-                        
-            for ( int i = 0; i < PIPES; i++ ) {
-                if ( pipe[ i ].isAvailable ) {
-                    memset( ( void * ) ( &pipe[ i ] ) - sizeof( pipe_t ) );
-                    pipe[ i ].isAvailable = false;
-                    pipe[ i ].wt = initPid;
-                    pipe[ i ].rd = finPid;
-                    break;
-                }
-            }
+            int availablePipeIndex = getAvailablePipe();
+            // Setting everything in the pipe to 0
+            memset( &pipe[ availablePipeIndex ], 0, sizeof( pipe_t ) );
+            
+            // Initiliasing a new pipe
+            pipe[ availablePipeIndex ].pipeID = availablePipeIndex;
+            pipe[ availablePipeIndex ].status = STATUS_CREATED;
+            pipe[ availablePipeIndex ].isAvailable = false;
+            pipe[ availablePipeIndex ].start = current->pid;
+            pipe[ availablePipeIndex ].end = ctx->gpr[ 0 ];
+//             pipe[ availablePipeIndex ].data = 0;
+            
+            // Returning the pipeID
+            ctx->gpr[ 0 ] = pipe[ availablePipeIndex ].pipeID;
             break;
         }
             
-        case 0x09 : { // 0x09 => openPipe( pid_t initPid, pid_t finPid )
+        case 0x09 : { // 0x09 => writePipe( int pipeIndex, uint32_t data )
+            // Getting the pipe ID from ctx
+            pid_t id = ctx->gpr[ 0 ];
             
-            pprint("OPEN-PIPE");
+            // Getting the index of the pipe ID received 
+            int getPipeIndex = getPipeIndex( id );
             
-            uint32_t initPid = ( uint32_t ) ( ctx->gpr[ 0 ] );
-            uint32_t finPid  = ( uint32_t ) ( ctx->gpr[ 1 ] );
-            
-            int pipeID = -1;
-            
-            for ( int i = 0; i < PIPES; i++ ) {
-                if ( pipe[ i ].wt == initPid && pipe[ i ].rd == finPid ) {
-                    pipeID = i;
-                    pipe[ i ].data = 0;      // setting pipe to empty
-                    break;
-                }
-            }
-            ctx->gpr[ 0 ] = pipeID;          // returning pipe identifier
+            // Updating pipe data with ctx passed
+            pipe[ getPipeIndex ].data = ctx->gpr[ 2 ];
             
             break;
         }
             
-        case 0x0A : { // 0x0A => writePipe( int pipeIndex, uint32_t data )
+        case 0x0A : { // 0x0A => readPipe( int start )
+            // Getting the pipe ID from ctx
+            pid_t id = ctx->gpr[ 0 ];
             
-            pprint("WRITE-PIPE");
+            for ( int i = 0; i < PIPES; i++ ) {
+                
+                switch ( current->pid ) {
+                    case ( pipe[ i ].start ) : { // for receiver
+                        if ( pipe[ i ].status != STATUS_TERMINATED ) {
+                            int data = pipe[ i ].data;
+                            ctx->gpr[ 0 ] = data;
+                        }
+                        break;
+                    }
+                    case ( pipe[ i ].end ) : { // for sender
+                        if ( pipe[ i ].status != STATUS_TERMINATED ) {
+                            int data = pipe[ i ].data;
+                            ctx->gpr[ 0 ] = data;
+                        }
+                        break;
+                    }
+                    default : {
+                        ctx->gpr[ 0 ] = -1;
+                        break;
+                    }
+                }
+            }
+            break;
+        }
+        case 0x0B : { // 0x0B => closePipe( int pipeIndex )
+            // Getting the pipe ID from ctx
+            pid_t id = ctx->gpr[ 0 ];
             
-            int pipeIndex = ( uint32_t ) ( ctx->gpr[ 0 ] );
-            uint32_t data = ( uint32_t ) ( ctx->gpr[ 1 ] );
-            pipe[ pipeIndex ].data = data;
+            int getPipeIndex = getPipeIndex( id );
+            
+            // Setting everything in the stack of that pipe to 0
+            memset( &pipe[ getPipeIndex ], 0, sizeof( pipe_t ) );
+            
+            pipe[ getPipeIndex ].isAvailable = true;
+            pipe[ getPipeIndex ].status = STATUS_TERMINATED;
             
             break;
         }
