@@ -41,20 +41,22 @@ typedef struct {
 } ctx_t;
 
 typedef struct {
-               pid_t    pid;           // process identifier
-            status_t status;
-               ctx_t    ctx;
-           bool isAvailable;
-             pid_t priority;
-     pid_t changed_priority;
-	      pid_t incPriority;        // increase priority by this val
+           pid_t    pid;         // process identifier
+        status_t status;
+           ctx_t    ctx;
+       bool isAvailable;
+         pid_t priority;
+ pid_t changed_priority;
+      pid_t incPriority;        // increase priority by this val
 } pcb_t;
 
 typedef struct {
-    pid_t wt;        // write 
-    pid_t rd;        // read
+    pid_t pipeID;
+    status_t status;
     bool isAvailable;
-    uint32_t data;
+    int start;       // opening end
+    int end;         // closing end
+    uint32_t data;   //pipe contents
 } pipe_t;
 
 #endif

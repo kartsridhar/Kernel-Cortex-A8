@@ -16,8 +16,8 @@ pcb_t* current = NULL;
 int noOfPCB = 0;                   // number of processes existing
 int availableSpaceIndex;           // to store the index of the next available space
 
-pipe_t pipe[ PIPES ];
-int noOfPipes = 0;
+// pipe_t pipe[ PIPES ];
+// int noOfPipes = 0;
 
 // Function to print to console, making things easier
 void pprint( char* str ) {
@@ -36,23 +36,23 @@ int getAvailableSpace( ) {
     return -1;
 } 
 
-// Function to return the index of the available pipe 
-int getAvailablePipe() {
-    for ( int i = 0; i < PIPES; i++ ) {
-        if ( pipe[ i ].isAvailable || pcb[ i ].status == STATUS_TERMINATED )
-            return i;
-    }
-    return -1;
-}
+// // Function to return the index of the available pipe 
+// int getAvailablePipe() {
+//     for ( int i = 0; i < PIPES; i++ ) {
+//         if ( pipe[ i ].isAvailable || pcb[ i ].status == STATUS_TERMINATED )
+//             return i;
+//     }
+//     return -1;
+// }
 
-// Function to get a respective pipe by pipe ID
-int getPipeIndex( pid_t id ) {
-    for ( int i = 0; i < PIPES; i++ ) {
-        if ( id == pipe[ i ].pipeID )
-            return i;
-    }
-    return -1;
-}
+// // Function to get a respective pipe by pipe ID
+// int getPipeIndex( pid_t id ) {
+//     for ( int i = 0; i < PIPES; i++ ) {
+//         if ( id == pipe[ i ].pipeID )
+//             return i;
+//     }
+//     return -1;
+// }
 
 // Function to choose the process with highest priority
 // Priority = initial priority + the change in priority
@@ -170,10 +170,10 @@ void hilevel_handler_rst( ctx_t* ctx ) {
         pcb[ i ].isAvailable = true;
     }
     
-    // Setting all pipes in PIPES to available
-    for ( int i = 0; i < PIPES; i++ ) {
-        pipe[ i ].isAvailable = true;
-    }
+//     // Setting all pipes in PIPES to available
+//     for ( int i = 0; i < PIPES; i++ ) {
+//         pipe[ i ].isAvailable = true;
+//     }
     
 	memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise the console
 	pcb[ 0 ].pid      = 0;
@@ -182,14 +182,14 @@ void hilevel_handler_rst( ctx_t* ctx ) {
 	pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_console );
 	pcb[ 0 ].ctx.sp   = ( uint32_t )( &tos_console );
     pcb[ 0 ].isAvailable = false;                // setting the process space to be unavailable
-	pcb[ 0 ].priority = 10;
-	pcb[ 0 ].changed_priority = 10;
+	pcb[ 0 ].priority = 20;
+	pcb[ 0 ].changed_priority = 20;
 	pcb[ 0 ].incPriority = 3;
 
     noOfPCB += 1;                                // increasing the process count by 1
     
 	dispatch( ctx, NULL, &pcb[ 0 ] );
-	
+    
 	// Enabling the IRQ interrupt
 	int_enable_irq();
 
@@ -229,7 +229,8 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
    */
     switch( id ) {
         case 0x00 : { // 0x00 => yield() = timer forcibly transfer the control to another process. 
-			break;
+// 			schedule( ctx );
+            break;
         }
 
         case 0x01 : { // 0x01 => write( fd, x, n )
@@ -275,11 +276,11 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             pcb[ availableSpaceIndex ].ctx.sp = ( uint32_t ) ( &tos_console + ( availableSpaceIndex ) * SIZE_OF_STACK );
             
             // Storing the stack pointer of the current process 
-            uint32_t newSP = ( uint32_t ) ( &tos_console + ( current->pid ) * SIZE_OF_STACK );
-            
+            uint32_t currentSP = ( uint32_t ) ( &tos_console + ( current->pid ) * SIZE_OF_STACK );
+
             // memcpy copies the stack downwards.
             // (void *) is used to indicate src and dest are pointers
-            memcpy( ( void * ) pcb[ availableSpaceIndex ].ctx.sp - SIZE_OF_STACK, ( void * ) newSP - SIZE_OF_STACK, SIZE_OF_STACK );
+            memcpy( ( void * ) pcb[ availableSpaceIndex ].ctx.sp - SIZE_OF_STACK, ( void * ) currentSP - SIZE_OF_STACK, SIZE_OF_STACK );
             
             ctx->gpr[ 0 ] = availableSpaceIndex;           // returning pid to the parent
             pcb[ availableSpaceIndex ].ctx.gpr[ 0 ] = 0;   // return 0 to the child
@@ -301,6 +302,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             
             ctx->pc = ( uint32_t ) ctx->gpr[ 0 ];          // loading the address from fork
             ctx->sp = ( uint32_t ) ( &tos_console + ( ( availableSpaceIndex ) * SIZE_OF_STACK ));
+//             schedule( ctx );
 			break;
 		}
             
@@ -316,87 +318,90 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             break; 
         }    
         
-        case 0x08 : { // 0x08 => pipe( int end )
+//         case 0x08 : { // 0x08 => pipe( int end )
             
-            pprint("CREATING_PIPE");
+//             pprint("CREATING_PIPE");
             
-            int availablePipeIndex = getAvailablePipe();
-            // Setting everything in the pipe to 0
-            memset( &pipe[ availablePipeIndex ], 0, sizeof( pipe_t ) );
+//             noOfPipes += 1;
+//             int availablePipeIndex = getAvailablePipe();
+//             // Setting everything in the pipe to 0
+//             memset( &pipe[ availablePipeIndex ], 0, sizeof( pipe_t ) );
             
-            // Initiliasing a new pipe
-            pipe[ availablePipeIndex ].pipeID = availablePipeIndex;
-            pipe[ availablePipeIndex ].status = STATUS_CREATED;
-            pipe[ availablePipeIndex ].isAvailable = false;
-            pipe[ availablePipeIndex ].start = current->pid;
-            pipe[ availablePipeIndex ].end = ctx->gpr[ 0 ];
-//             pipe[ availablePipeIndex ].data = 0;
+//             // Initiliasing a new pipe
+//             pipe[ availablePipeIndex ].pipeID = availablePipeIndex;
+//             pipe[ availablePipeIndex ].status = STATUS_CREATED;
+//             pipe[ availablePipeIndex ].isAvailable = false;
+//             pipe[ availablePipeIndex ].start = current->pid;
+//             pipe[ availablePipeIndex ].end = ctx->gpr[ 0 ];
+// //             pipe[ availablePipeIndex ].data = 0;
             
-            // Returning the pipeID
-            ctx->gpr[ 0 ] = pipe[ availablePipeIndex ].pipeID;
-            break;
-        }
+//             // Returning the pipeID
+//             ctx->gpr[ 0 ] = pipe[ availablePipeIndex ].pipeID;
+//             break;
+//         }
             
-        case 0x09 : { // 0x09 => writePipe( int pipeIndex, uint32_t data )
-            // Getting the pipe ID from ctx
-            pid_t id = ctx->gpr[ 0 ];
+//         case 0x09 : { // 0x09 => writePipe( int pipeIndex, uint32_t data )
+//             // Getting the pipe ID from ctx
+//             pid_t id = ctx->gpr[ 0 ];
             
-            // Getting the index of the pipe ID received 
-            int getPipeIndex = getPipeIndex( id );
+//             // Getting the index of the pipe ID received 
+//             int getPipeIndex = getPipeIndex( id );
             
-            // Updating pipe data with ctx passed
-            pipe[ getPipeIndex ].data = ctx->gpr[ 2 ];
+//             // Updating pipe data with ctx passed in
+//             pipe[ getPipeIndex ].data = ctx->gpr[ 2 ];
             
-            break;
-        }
+//             break;
+//         }
             
-        case 0x0A : { // 0x0A => readPipe( int start )
-            // Getting the pipe ID from ctx
-            pid_t id = ctx->gpr[ 0 ];
+//         case 0x0A : { // 0x0A => readPipe( int start )
+//             // Getting the pipe ID from ctx
+//             pid_t id = ctx->gpr[ 0 ];
             
-            for ( int i = 0; i < PIPES; i++ ) {
+//             for ( int i = 0; i < PIPES; i++ ) {
                 
-                switch ( current->pid ) {
-                    case ( pipe[ i ].start ) : { // for receiver
-                        if ( pipe[ i ].status != STATUS_TERMINATED ) {
-                            int data = pipe[ i ].data;
-                            ctx->gpr[ 0 ] = data;
-                        }
-                        break;
-                    }
-                    case ( pipe[ i ].end ) : { // for sender
-                        if ( pipe[ i ].status != STATUS_TERMINATED ) {
-                            int data = pipe[ i ].data;
-                            ctx->gpr[ 0 ] = data;
-                        }
-                        break;
-                    }
-                    default : {
-                        ctx->gpr[ 0 ] = -1;
-                        break;
-                    }
-                }
-            }
-            break;
-        }
-        case 0x0B : { // 0x0B => closePipe( int pipeIndex )
-            // Getting the pipe ID from ctx
-            pid_t id = ctx->gpr[ 0 ];
+//                 switch ( current->pid ) {
+                        
+//                     case ( pipe[ i ].start ) : { // for receiver
+//                         if ( pipe[ i ].status != STATUS_TERMINATED ) {
+//                             int data = pipe[ i ].data;
+//                             ctx->gpr[ 0 ] = data;
+//                         }
+//                         break;
+//                     }
+                        
+//                     case ( pipe[ i ].end ) : { // for sender
+//                         if ( pipe[ i ].status != STATUS_TERMINATED ) {
+//                             int data = pipe[ i ].data;
+//                             ctx->gpr[ 0 ] = data;
+//                         }
+//                         break;
+//                     }
+//                     default : {
+//                         ctx->gpr[ 0 ] = -1;
+//                         break;
+//                     }
+//                 }
+//             }
+//             break;
+//         }
+//         case 0x0B : { // 0x0B => closePipe( int pipeIndex )
+//             // Getting the pipe ID from ctx
+//             pid_t id = ctx->gpr[ 0 ];
             
-            int getPipeIndex = getPipeIndex( id );
+//             int getPipeIndex = getPipeIndex( id );
             
-            // Setting everything in the stack of that pipe to 0
-            memset( &pipe[ getPipeIndex ], 0, sizeof( pipe_t ) );
+//             // Setting everything in the stack of that pipe to 0
+//             memset( &pipe[ getPipeIndex ], 0, sizeof( pipe_t ) );
             
-            pipe[ getPipeIndex ].isAvailable = true;
-            pipe[ getPipeIndex ].status = STATUS_TERMINATED;
+//             pipe[ getPipeIndex ].isAvailable = true;
+//             pipe[ getPipeIndex ].status = STATUS_TERMINATED;
             
-            break;
-        }
+//             break;
+//         }
             
-        default   : { // 0x?? => unknown/unsupported
-			break;
-        }            
+//         default   : { // 0x?? => unknown/unsupported
+// 			break;
+//         }            
     }       
     return;
 }
