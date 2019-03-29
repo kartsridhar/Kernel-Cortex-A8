@@ -1,7 +1,7 @@
 /* Copyright (C) 2017 Daniel Page <csdsp@bristol.ac.uk>
  *
- * Use of this source code is restricted per the CC BY-NC-ND license, a copy of 
- * which can be found via http://creativecommons.org (and should be included as 
+ * Use of this source code is restricted per the CC BY-NC-ND license, a copy of
+ * which can be found via http://creativecommons.org (and should be included as
  * LICENSE.txt within the associated archive or repository).
  */
 
@@ -20,7 +20,7 @@ typedef int pid_t;
  *
  * 1. system call identifiers (i.e., the constant used by a system call
  *    to specify which action the kernel should take),
- * 2. signal identifiers (as used by the kill system call), 
+ * 2. signal identifiers (as used by the kill system call),
  * 3. status codes for exit,
  * 4. standard file descriptors (e.g., for read and write system calls),
  * 5. platform-specific constants, which may need calibration (wrt. the
@@ -40,17 +40,17 @@ typedef int pid_t;
 #define SYS_NICE        ( 0x07 )
 
 // for pipelines
-#define SYS_PIPE        ( 0x08 )        
-#define SYS_WRITE_PIPE  ( 0x09 )  
+#define SYS_PIPE        ( 0x08 )
+#define SYS_WRITE_PIPE  ( 0x09 )
 #define SYS_READ_PIPE   ( 0x0A )
-#define SYS_CLOSE_PIPE  ( 0x0B )   
+#define SYS_CLOSE_PIPE  ( 0x0B )
 
 #define SIG_TERM       ( 0x00 )
 #define SIG_QUIT       ( 0x01 )
 
 #define EXIT_SUCCESS   ( 0 )
 #define EXIT_FAILURE   ( 1 )
- 
+
 #define  STDIN_FILENO  ( 0 )
 #define STDOUT_FILENO  ( 1 )
 #define STDERR_FILENO  ( 2 )
@@ -90,8 +90,7 @@ extern void writePipe( int pipeIndex, uint32_t data );
 // read data from pipe, block if needed
 extern int readPipe( int start );
 
-// close pipe 
+// close pipe
 extern void closePipe( int pipeIndex );
 
 #endif
-
