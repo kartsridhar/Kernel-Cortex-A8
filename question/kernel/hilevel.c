@@ -1,7 +1,7 @@
 /* Copyright (C) 2017 Daniel Page <csdsp@bristol.ac.uk>
  *
- * Use of this source code is restricted per the CC BY-NC-ND license, a copy of
- * which can be found via http://creativecommons.org (and should be included as
+ * Use of this source code is restricted per the CC BY-NC-ND license, a copy of 
+ * which can be found via http://creativecommons.org (and should be included as 
  * LICENSE.txt within the associated archive or repository).
  */
 
@@ -11,13 +11,13 @@
 #define SIZE_OF_STACK 0x00001000   // defining the size of stack
 #define PIPES 16                   // max number of pipes
 
-pcb_t pcb[ PROCESSES ];
+pcb_t pcb[ PROCESSES ]; 
 pcb_t* current = NULL;
 int noOfPCB = 0;                   // number of processes existing
 int availableSpaceIndex;           // to store the index of the next available space
 
-// pipe_t pipe[ PIPES ];
-// int noOfPipes = 0;
+pipe_t pipe[ PIPES ];
+int noOfPipes = 0;
 
 // Function to print to console, making things easier
 void pprint( char* str ) {
@@ -26,7 +26,7 @@ void pprint( char* str ) {
     }
 }
 
-// Function to return the index of the available space
+// Function to return the index of the available space 
 int getAvailableSpace( ) {
     for ( int i = 0; i < noOfPCB; i++ ) {
         if ( pcb[ i ].isAvailable || pcb[ i ].status == STATUS_TERMINATED ) {
@@ -34,43 +34,43 @@ int getAvailableSpace( ) {
         }
     }
     return -1;
+} 
+
+// Function to return the index of the available pipe 
+int getAvailablePipe() {
+    for ( int i = 0; i < PIPES; i++ ) {
+        if ( pipe[ i ].isAvailable || pcb[ i ].status == STATUS_TERMINATED )
+            return i;
+    }
+    return -1;
 }
 
-// // Function to return the index of the available pipe
-// int getAvailablePipe() {
-//     for ( int i = 0; i < PIPES; i++ ) {
-//         if ( pipe[ i ].isAvailable || pcb[ i ].status == STATUS_TERMINATED )
-//             return i;
-//     }
-//     return -1;
-// }
-//
-// // Function to get a respective pipe by pipe ID
-// int getPipeIndex( pid_t id ) {
-//     for ( int i = 0; i < PIPES; i++ ) {
-//         if ( id == pipe[ i ].pipeID )
-//             return i;
-//     }
-//     return -1;
-// }
+// Function to get a respective pipe by pipe ID
+int getPipeIndex( pid_t id ) {
+    for ( int i = 0; i < PIPES; i++ ) {
+        if ( id == pipe[ i ].pipeID )
+            return i;
+    }
+    return -1;
+}
 
 // Function to choose the process with highest priority
 // Priority = initial priority + the change in priority
 // Reset the current process' changed priority to the original priority
 // Increase the changed priority of every process by the increment priority value
-// returns the index of the process with highest priority
+// returns the index of the process with highest priority  
 int findMaxPriority() {
-    int maxPriority = 0;
+    int maxPriority = 0;              
     int temp = 0;
-
+    
     current->changed_priority = current->priority;
-
-    for ( int i = 0; i < noOfPCB; i++ ) {
-
+    
+    for ( int i = 0; i < noOfPCB; i++ ) {       
+        
         if ( pcb[ i ].pid != current->pid && pcb[ i ].status != STATUS_TERMINATED ) {
-
-            pcb[ i ].changed_priority += pcb[ i ].incPriority;
-            int priority = pcb[ i ].changed_priority + pcb[ i ].priority;
+            
+            pcb[ i ].changed_priority += pcb[ i ].incPriority;    
+            int priority = pcb[ i ].changed_priority + pcb[ i ].priority;      
 
             if ( maxPriority < priority ) {
                 maxPriority = priority;
@@ -105,7 +105,7 @@ void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
     PL011_putc( UART0, '>',      true );
     PL011_putc( UART0, next_pid, true );
     PL011_putc( UART0, ']',      true );
-
+    
     current = next;                             // update   executing index   to P_{next}
 
   return;
@@ -119,8 +119,8 @@ into place, before updating 'current' to refelct new active PCB.
 */
 
 void roundRobinSchedule( ctx_t* ctx ) {
-
-    for ( int i = 0; i < noOfPCB; i++ ) {
+    
+    for ( int i = 0; i < noOfPCB; i++ ) {      
         if ( current->pid == pcb[ i ].pid ) {
             int nextProcessIndex = ( i + 1 ) % noOfPCB;
             dispatch( ctx, &pcb[ i ], &pcb[ nextProcessIndex ] );
@@ -133,14 +133,14 @@ void roundRobinSchedule( ctx_t* ctx ) {
 }
 
 void prioritySchedule( ctx_t* ctx ) {
-
+            
     int maxP = findMaxPriority();
 
     dispatch( ctx, current, &pcb[ maxP ] );
-
+    
     current->status = STATUS_READY;
     pcb[ maxP ].status = STATUS_EXECUTING;
-
+       
     return;
 }
 
@@ -150,7 +150,7 @@ extern uint32_t tos_console;
 //-------------------------------------------------------------------------------
 
 void hilevel_handler_rst( ctx_t* ctx ) {
-
+    
     // Configuring the timer interrupt (from lab-4_q)
 	TIMER0->Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
 	TIMER0->Timer1Ctrl  = 0x00000002; // select 32-bit   timer
@@ -162,19 +162,19 @@ void hilevel_handler_rst( ctx_t* ctx ) {
 	GICD0->ISENABLER1  |= 0x00000010; // enable timer          interrupt
 	GICC0->CTLR         = 0x00000001; // enable GIC interface
 	GICD0->CTLR         = 0x00000001; // enable GIC distributor
-
+	
     pprint("RESET");
-
+    
     // Setting all processes in N to available
     for ( int i = 0; i < PROCESSES; i++ ){
         pcb[ i ].isAvailable = true;
     }
-
-    // // Setting all pipes in PIPES to available
-    // for ( int i = 0; i < PIPES; i++ ) {
-    //     pipe[ i ].isAvailable = true;
-    // }
-
+    
+    // Setting all pipes in PIPES to available
+    for ( int i = 0; i < PIPES; i++ ) {
+        pipe[ i ].isAvailable = true;
+    }
+    
 	memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise the console
 	pcb[ 0 ].pid      = 0;
 	pcb[ 0 ].status   = STATUS_CREATED;
@@ -187,9 +187,9 @@ void hilevel_handler_rst( ctx_t* ctx ) {
 	pcb[ 0 ].incPriority = 3;
 
     noOfPCB += 1;                                // increasing the process count by 1
-
+    
 	dispatch( ctx, NULL, &pcb[ 0 ] );
-
+    
 	// Enabling the IRQ interrupt
 	int_enable_irq();
 
@@ -205,15 +205,15 @@ void hilevel_handler_irq( ctx_t* ctx ) {
     // Step 4: handle the interrupt, then clear (or reset) the source.
 
     if( id == GIC_SOURCE_TIMER0 ) {
-
+        
         // Switch context between process control blocks
-        prioritySchedule( ctx );
-//         roundRobinSchedule( ctx );
+        prioritySchedule( ctx );   
+//         roundRobinSchedule( ctx ); 
         TIMER0->Timer1IntClr = 0x01;
     }
-
+    
     // Step 5: write the interrupt identifier to signal we're done.
-
+   
     GICC0->EOIR = id;
     return;
 }
@@ -228,7 +228,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
    * - write any return value back to preserved usr mode registers.
    */
     switch( id ) {
-        case 0x00 : { // 0x00 => yield() = timer forcibly transfer the control to another process.
+        case 0x00 : { // 0x00 => yield() = timer forcibly transfer the control to another process. 
 // 			schedule( ctx );
             break;
         }
@@ -246,162 +246,180 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
 			break;
         }
-
+		
 		case 0x02 : { // 0x02 => read( fd, x, n )
 			break;
 		}
 
 		case 0x03 : { // 0x03 => fork()
-
+            
             pprint("FORK");
-
+            
             noOfPCB += 1;
             availableSpaceIndex = getAvailableSpace();
-
+            
             // Setting everything in the stack to 0
             memset( &pcb[ availableSpaceIndex ], 0, sizeof( pcb_t ) );
-
+            
             // Copying the contents of stack into the child process
             memcpy( &pcb[ availableSpaceIndex ].ctx, ctx , sizeof( ctx_t ) );
-
+            
             // Creating a new child process with unique available PID
             pcb[ availableSpaceIndex ].pid      = availableSpaceIndex;
             pcb[ availableSpaceIndex ].status   = STATUS_CREATED;
             pcb[ availableSpaceIndex ].isAvailable   = false;
             pcb[ availableSpaceIndex ].priority = ( availableSpaceIndex * 3 );
             pcb[ availableSpaceIndex ].changed_priority = ( availableSpaceIndex * 3 );
-            pcb[ availableSpaceIndex ].incPriority = 2;
-
+            pcb[ availableSpaceIndex ].incPriority = 2;    
+            
+            // Storing the stack pointer of the current process 
+            uint32_t currentStack = ( uint32_t ) ( &tos_console + ( current->pid ) * SIZE_OF_STACK );
+            
+            // Child process' stack pointer
+            uint32_t childStack = ( uint32_t ) ( &tos_console + ( availableSpaceIndex ) * SIZE_OF_STACK );
+            
+            // getting the stack needed for copying
+            uint32_t offsetStack = currentStack - ( ctx->sp );
+            
             // Setting the stack pointer of the child process to the required
-            pcb[ availableSpaceIndex ].ctx.sp = ( uint32_t ) ( &tos_console + ( availableSpaceIndex ) * SIZE_OF_STACK );
-
-            // Storing the stack pointer of the current process
-            uint32_t currentSP = ( uint32_t ) ( &tos_console + ( current->pid ) * SIZE_OF_STACK );
+            pcb[ availableSpaceIndex ].ctx.sp = childStack - offsetStack;
 
             // memcpy copies the stack downwards.
             // (void *) is used to indicate src and dest are pointers
-            memcpy( ( void * ) pcb[ availableSpaceIndex ].ctx.sp - SIZE_OF_STACK, ( void * ) currentSP - SIZE_OF_STACK, SIZE_OF_STACK );
-
+            memcpy( ( void * ) childStack - SIZE_OF_STACK, ( void * ) currentStack - SIZE_OF_STACK, SIZE_OF_STACK );
+            
             ctx->gpr[ 0 ] = availableSpaceIndex;           // returning pid to the parent
             pcb[ availableSpaceIndex ].ctx.gpr[ 0 ] = 0;   // return 0 to the child
             break;
 		}
-
+		
 		case 0x04 : { // 0x04 => exit()
-
+            
             pprint("EXIT");
-
-            // Simply terminating the process
+            
+            // Simply terminating the process 
             current->status = STATUS_TERMINATED;
 			break;
 		}
-
+        
         case 0x05 : { // 0x05 => exec()
 
             pprint("EXEC");
-
+            
             ctx->pc = ( uint32_t ) ctx->gpr[ 0 ];          // loading the address from fork
             ctx->sp = ( uint32_t ) ( &tos_console + ( ( availableSpaceIndex ) * SIZE_OF_STACK ));
             prioritySchedule( ctx );
 			break;
 		}
-
+            
         case 0x06 : { // 0x06 => kill()
-
+            
             pprint("KILL");
-
+            
             uint32_t kill = ( uint32_t ) ( ctx->gpr[ 0 ] );
             noOfPCB -= 1;
             pcb[ kill ].isAvailable = true;
             pcb[ kill ].status = STATUS_TERMINATED;
-
+            
+            break; 
+        }    
+        
+        case 0x08 : { // 0x08 => pipe( int end )
+            
+            pprint("CREATING_PIPE");
+            
+            noOfPipes += 1;
+            int availablePipeIndex = getAvailablePipe();
+            // Setting everything in the pipe to 0
+            memset( &pipe[ availablePipeIndex ], 0, sizeof( pipe_t ) );
+            
+            // Initiliasing a new pipe
+            pipe[ availablePipeIndex ].pipeID = availablePipeIndex;
+            pipe[ availablePipeIndex ].status = STATUS_CREATED;
+            pipe[ availablePipeIndex ].isAvailable = false;
+            pipe[ availablePipeIndex ].start = current->pid;
+            pipe[ availablePipeIndex ].end = ctx->gpr[ 0 ];
+//             pipe[ availablePipeIndex ].data = 0;
+            
+            // Returning the pipeID
+            ctx->gpr[ 0 ] = pipe[ availablePipeIndex ].pipeID;
             break;
         }
-
-//         case 0x08 : { // 0x08 => pipe( int end )
-//
-//             pprint("CREATING_PIPE");
-//
-//             noOfPipes += 1;
-//             int availablePipeIndex = getAvailablePipe();
-//             // Setting everything in the pipe to 0
-//             memset( &pipe[ availablePipeIndex ], 0, sizeof( pipe_t ) );
-//
-//             // Initiliasing a new pipe
-//             pipe[ availablePipeIndex ].pipeID = availablePipeIndex;
-//             pipe[ availablePipeIndex ].status = STATUS_CREATED;
-//             pipe[ availablePipeIndex ].isAvailable = false;
-//             pipe[ availablePipeIndex ].start = current->pid;
-//             pipe[ availablePipeIndex ].end = ctx->gpr[ 0 ];
-// //             pipe[ availablePipeIndex ].data = 0;
-//
-//             // Returning the pipeID
-//             ctx->gpr[ 0 ] = pipe[ availablePipeIndex ].pipeID;
-//             break;
-//         }
-//
-//         case 0x09 : { // 0x09 => writePipe( int pipeIndex, uint32_t data )
-//             // Getting the pipe ID from ctx
-//             pid_t id = ctx->gpr[ 0 ];
-//
-//             // Getting the index of the pipe ID received
-//             int getPipeIndex = getPipeIndex( id );
-//
-//             // Updating pipe data with ctx passed in
-//             pipe[ getPipeIndex ].data = ctx->gpr[ 2 ];
-//
-//             break;
-//         }
-//
-//         case 0x0A : { // 0x0A => readPipe( int start )
-//             // Getting the pipe ID from ctx
-//             pid_t id = ctx->gpr[ 0 ];
-//
-//             for ( int i = 0; i < PIPES; i++ ) {
-//
-//                 switch ( current->pid ) {
-//
-//                     case ( pipe[ i ].start ) : { // for receiver
-//                         if ( pipe[ i ].status != STATUS_TERMINATED ) {
-//                             int data = pipe[ i ].data;
-//                             ctx->gpr[ 0 ] = data;
-//                         }
-//                         break;
-//                     }
-//
-//                     case ( pipe[ i ].end ) : { // for sender
-//                         if ( pipe[ i ].status != STATUS_TERMINATED ) {
-//                             int data = pipe[ i ].data;
-//                             ctx->gpr[ 0 ] = data;
-//                         }
-//                         break;
-//                     }
-//                     default : {
-//                         ctx->gpr[ 0 ] = -1;
-//                         break;
-//                     }
-//                 }
-//             }
-//             break;
-//         }
-//         case 0x0B : { // 0x0B => closePipe( int pipeIndex )
-//             // Getting the pipe ID from ctx
-//             pid_t id = ctx->gpr[ 0 ];
-//
-//             int getPipeIndex = getPipeIndex( id );
-//
-//             // Setting everything in the stack of that pipe to 0
-//             memset( &pipe[ getPipeIndex ], 0, sizeof( pipe_t ) );
-//
-//             pipe[ getPipeIndex ].isAvailable = true;
-//             pipe[ getPipeIndex ].status = STATUS_TERMINATED;
-//
-//             break;
-//         }
-
+            
+        case 0x09 : { // 0x09 => writePipe( int pipeIndex, uint32_t data )
+            // Getting the pipe ID from ctx
+            pid_t id = ctx->gpr[ 0 ];
+            
+            // Getting the index of the pipe ID received 
+            int get = getPipeIndex( id );
+            
+            // Updating pipe data with ctx passed in
+            pipe[ get ].data = ctx->gpr[ 2 ];
+            
+            break;
+        }
+            
+        case 0x0A : { // 0x0A => readPipe( int start )
+            // Getting the pipe ID from ctx
+            pid_t id = ctx->gpr[ 0 ];
+            
+            for ( int i = 0; i < PIPES; i++ ) {
+                /* case 1: pipe creator attempting to read 
+                 * case 2: pipe receiver attempting to read
+                 * */
+                
+                // 1.
+                if ( current->pid == pipe[ i ].start )
+                {
+                    if ( id == pipe[ i ].end )
+                    {
+                        if ( pipe[ i ].status != STATUS_TERMINATED )
+                        {
+                            int data = pipe[ i ].data;
+                            ctx->gpr[ 0 ] = data;
+                            return;
+                        }
+                    }
+                }
+                
+                // 2.
+                if ( current->pid == pipe[ i ].end )
+                {
+                    if ( id == pipe[ i ].start )
+                    {
+                        if ( pipe[ i ].status != STATUS_TERMINATED )
+                        {
+                            int data = pipe[ i ].data;
+                            ctx->gpr[ 0 ] = data;
+                            return;
+                        }
+                    }
+                }
+                else
+                    ctx->gpr[ 0 ] = -1;
+            }
+            break;
+        }
+        case 0x0B : { // 0x0B => closePipe( int pipeIndex )
+            // Getting the pipe ID from ctx
+            pid_t id = ctx->gpr[ 0 ];
+            
+            int get = getPipeIndex( id );
+            
+            // Setting everything in the stack of that pipe to 0
+            memset( &pipe[ get ], 0, sizeof( pipe_t ) );
+            
+            pipe[ get ].isAvailable = true;
+            pipe[ get ].status = STATUS_TERMINATED;
+            
+            break;
+        }
+            
         default   : { // 0x?? => unknown/unsupported
 			break;
-        }
-    }
+        }            
+    }       
     return;
 }
+    
+
