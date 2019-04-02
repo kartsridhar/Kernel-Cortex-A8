@@ -19,3 +19,4 @@ void main_philosopher() {
     exit(EXIT_SUCCESS);
 }
 
+

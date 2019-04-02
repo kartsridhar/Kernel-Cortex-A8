@@ -8,8 +8,8 @@
 #include "hilevel.h"
 
 #define PROCESSES 10               // max number of processes
-#define SIZE_OF_STACK 0x00005000   // defining the size of stack
-#define PIPES 16                   // max number of pipes
+#define SIZE_OF_STACK 0x00001000   // defining the size of stack
+#define PIPES 32                   // max number of pipes
 
 pcb_t pcb[ PROCESSES ]; 
 pcb_t* current = NULL;
@@ -38,7 +38,7 @@ int getAvailableSpace( ) {
 
 // Function to return the index of the available pipe 
 int getAvailablePipe() {
-    for ( int i = 0; i < noOfPipes; i++ ) {
+    for ( int i = 0; i < PIPES; i++ ) {
         if ( pipes[ i ].status == STATUS_TERMINATED )
             return i;
     }
@@ -144,8 +144,11 @@ void prioritySchedule( ctx_t* ctx ) {
     return;
 }
 
-extern void     main_console();
+extern void main_console();
+extern void main_philosopher();
+extern void main_waiter();
 extern uint32_t tos_console;
+extern uint32_t tos_USR;          // for user programs
 
 //-------------------------------------------------------------------------------
 
@@ -273,10 +276,10 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             pcb[ availableSpaceIndex ].incPriority = 2;    
             
             // Storing the stack pointer of the current process 
-            uint32_t currentStack = ( uint32_t ) ( &tos_console + ( current->pid ) * SIZE_OF_STACK );
+            uint32_t currentStack = ( uint32_t ) ( &tos_USR + ( current->pid ) * SIZE_OF_STACK );
             
             // Child process' stack pointer
-            uint32_t childStack = ( uint32_t ) ( &tos_console + ( availableSpaceIndex ) * SIZE_OF_STACK );
+            uint32_t childStack = ( uint32_t ) ( &tos_USR + ( availableSpaceIndex ) * SIZE_OF_STACK );
             
             // getting the stack needed for copying
             uint32_t offsetStack = currentStack - ( ctx->sp );
@@ -326,7 +329,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
         
         case 0x08 : { // 0x08 => pipe( int end )
             
-            pprint("CREATING_PIPE");
+//             pprint("CREATING_PIPE");
             
             noOfPipes += 1;
             int availablePipeIndex = getAvailablePipe();
@@ -346,7 +349,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             
         case 0x09 : { // 0x09 => writePipe( int pipeIndex, uint32_t data )
             
-            pprint("WRITING");
+//             pprint("WRITING");
             
             // Getting the pipe ID from ctx
             pid_t id = ctx->gpr[ 0 ];
@@ -362,12 +365,12 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             
         case 0x10 : { // 0x10 => readPipe( int start )
            
-            pprint("READING");
+//             pprint("READING");
             
             // Getting the pipe ID from ctx
             pid_t id = ctx->gpr[ 0 ];
             
-            for ( int i = 0; i < noOfPipes; i++ ) {
+            for ( int i = 0; i < PIPES; i++ ) {
                 /* case 1: pipe creator attempting to read 
                  * case 2: pipe receiver attempting to read
                  * */
@@ -402,7 +405,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
         }
         case 0x11 : { // 0x11 => closePipe( int pipeIndex )
            
-            pprint("CLOSING");
+//             pprint("CLOSING");
             
             // Getting the pipe ID from ctx
             pid_t id = ctx->gpr[ 0 ];
@@ -414,6 +417,11 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
             pipes[ get ].status = STATUS_TERMINATED;
             
+            break;
+        }
+        
+        case 0x12 : { // 0x12 => getProcessID()
+            ctx->gpr[ 0 ] = current->pid;
             break;
         }
             

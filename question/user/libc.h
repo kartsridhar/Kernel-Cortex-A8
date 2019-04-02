@@ -43,7 +43,7 @@ typedef int pid_t;
 #define SYS_PIPE        ( 0x08 )        
 #define SYS_WRITE_PIPE  ( 0x09 )  
 #define SYS_READ_PIPE   ( 0x10 )
-#define SYS_CLOSE_PIPE  ( 0x11 )   
+#define SYS_CLOSE_PIPE  ( 0x11 )
 
 #define SIG_TERM       ( 0x00 )
 #define SIG_QUIT       ( 0x01 )
