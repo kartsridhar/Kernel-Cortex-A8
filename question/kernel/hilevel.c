@@ -8,7 +8,7 @@
 #include "hilevel.h"
 
 #define PROCESSES 10               // max number of processes
-#define SIZE_OF_STACK 0x00001000   // defining the size of stack
+#define SIZE_OF_STACK 0x00005000   // defining the size of stack
 #define PIPES 16                   // max number of pipes
 
 pcb_t pcb[ PROCESSES ]; 
@@ -16,7 +16,7 @@ pcb_t* current = NULL;
 int noOfPCB = 0;                   // number of processes existing
 int availableSpaceIndex;           // to store the index of the next available space
 
-pipe_t pipe[ PIPES ];
+pipe_t pipes[ PIPES ];
 int noOfPipes = 0;
 
 // Function to print to console, making things easier
@@ -38,8 +38,8 @@ int getAvailableSpace( ) {
 
 // Function to return the index of the available pipe 
 int getAvailablePipe() {
-    for ( int i = 0; i < PIPES; i++ ) {
-        if ( pipe[ i ].isAvailable || pcb[ i ].status == STATUS_TERMINATED )
+    for ( int i = 0; i < noOfPipes; i++ ) {
+        if ( pipes[ i ].status == STATUS_TERMINATED )
             return i;
     }
     return -1;
@@ -48,7 +48,7 @@ int getAvailablePipe() {
 // Function to get a respective pipe by pipe ID
 int getPipeIndex( pid_t id ) {
     for ( int i = 0; i < PIPES; i++ ) {
-        if ( id == pipe[ i ].pipeID )
+        if ( id == pipes[ i ].pipeID )
             return i;
     }
     return -1;
@@ -172,7 +172,7 @@ void hilevel_handler_rst( ctx_t* ctx ) {
     
     // Setting all pipes in PIPES to available
     for ( int i = 0; i < PIPES; i++ ) {
-        pipe[ i ].isAvailable = true;
+        pipes[ i ].status = STATUS_TERMINATED;
     }
     
 	memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise the console
@@ -331,22 +331,23 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             noOfPipes += 1;
             int availablePipeIndex = getAvailablePipe();
             // Setting everything in the pipe to 0
-            memset( &pipe[ availablePipeIndex ], 0, sizeof( pipe_t ) );
+            memset( &pipes[ availablePipeIndex ], 0, sizeof( pipe_t ) );
             
             // Initiliasing a new pipe
-            pipe[ availablePipeIndex ].pipeID = availablePipeIndex;
-            pipe[ availablePipeIndex ].status = STATUS_CREATED;
-            pipe[ availablePipeIndex ].isAvailable = false;
-            pipe[ availablePipeIndex ].start = current->pid;
-            pipe[ availablePipeIndex ].end = ctx->gpr[ 0 ];
-//             pipe[ availablePipeIndex ].data = 0;
+            pipes[ availablePipeIndex ].pipeID = availablePipeIndex;
+            pipes[ availablePipeIndex ].status = STATUS_READY;
+            pipes[ availablePipeIndex ].start = current->pid;
+            pipes[ availablePipeIndex ].end = ctx->gpr[ 0 ];
             
             // Returning the pipeID
-            ctx->gpr[ 0 ] = pipe[ availablePipeIndex ].pipeID;
+            ctx->gpr[ 0 ] = pipes[ availablePipeIndex ].pipeID;
             break;
         }
             
         case 0x09 : { // 0x09 => writePipe( int pipeIndex, uint32_t data )
+            
+            pprint("WRITING");
+            
             // Getting the pipe ID from ctx
             pid_t id = ctx->gpr[ 0 ];
             
@@ -354,45 +355,44 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             int get = getPipeIndex( id );
             
             // Updating pipe data with ctx passed in
-            pipe[ get ].data = ctx->gpr[ 2 ];
+            pipes[ get ].data = ctx->gpr[ 2 ];
             
             break;
         }
             
-        case 0x0A : { // 0x0A => readPipe( int start )
+        case 0x10 : { // 0x10 => readPipe( int start )
+           
+            pprint("READING");
+            
             // Getting the pipe ID from ctx
             pid_t id = ctx->gpr[ 0 ];
             
-            for ( int i = 0; i < PIPES; i++ ) {
+            for ( int i = 0; i < noOfPipes; i++ ) {
                 /* case 1: pipe creator attempting to read 
                  * case 2: pipe receiver attempting to read
                  * */
                 
                 // 1.
-                if ( current->pid == pipe[ i ].start )
+                if ( current->pid == pipes[ i ].start 
+                   && id == pipes[ i ].end )
                 {
-                    if ( id == pipe[ i ].end )
+                    if ( pipes[ i ].status != STATUS_TERMINATED )
                     {
-                        if ( pipe[ i ].status != STATUS_TERMINATED )
-                        {
-                            int data = pipe[ i ].data;
-                            ctx->gpr[ 0 ] = data;
-                            return;
-                        }
+                        int data = pipes[ i ].data;
+                        ctx->gpr[ 0 ] = pipes[ i ].data;
+                        break;
                     }
                 }
                 
                 // 2.
-                if ( current->pid == pipe[ i ].end )
+                if ( current->pid == pipes[ i ].end 
+                   && id == pipes[ i ].start )
                 {
-                    if ( id == pipe[ i ].start )
+                    if ( pipes[ i ].status != STATUS_TERMINATED )
                     {
-                        if ( pipe[ i ].status != STATUS_TERMINATED )
-                        {
-                            int data = pipe[ i ].data;
-                            ctx->gpr[ 0 ] = data;
-                            return;
-                        }
+                        int data = pipes[ i ].data;
+                        ctx->gpr[ 0 ] = pipes[ i ].data;
+                        break;
                     }
                 }
                 else
@@ -400,17 +400,19 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             }
             break;
         }
-        case 0x0B : { // 0x0B => closePipe( int pipeIndex )
+        case 0x11 : { // 0x11 => closePipe( int pipeIndex )
+           
+            pprint("CLOSING");
+            
             // Getting the pipe ID from ctx
             pid_t id = ctx->gpr[ 0 ];
             
             int get = getPipeIndex( id );
             
             // Setting everything in the stack of that pipe to 0
-            memset( &pipe[ get ], 0, sizeof( pipe_t ) );
-            
-            pipe[ get ].isAvailable = true;
-            pipe[ get ].status = STATUS_TERMINATED;
+            memset( &pipes[ get ], 0, sizeof( pipe_t ) );
+
+            pipes[ get ].status = STATUS_TERMINATED;
             
             break;
         }
@@ -422,4 +424,5 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     return;
 }
     
+
 

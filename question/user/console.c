@@ -52,7 +52,6 @@ void* load( char* x ) {
   else if( 0 == strcmp( x, "2B" ) ) {
     return &main_waiter;
   }
-
   return NULL;
 }
 
@@ -115,3 +114,4 @@ void main_console() {
 
   exit( EXIT_SUCCESS );
 }
+

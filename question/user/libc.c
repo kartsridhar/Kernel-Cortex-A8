@@ -7,13 +7,6 @@
 
 #include "libc.h"
 
-extern int find_philosopher_pid();
-
-int find_philo_pid() {
-    int id = find_philosopher_pid();
-    return id;
-}
-
 int  atoi( char* x        ) {
   char* p = x; bool s = false; int r = 0;
 
@@ -202,6 +195,8 @@ void closePipe( int pipeIndex ) {
 
     return;
 }
+
+
 
 
 
