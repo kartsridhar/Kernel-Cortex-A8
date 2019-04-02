@@ -149,51 +149,103 @@ void nice( int pid, int x ) {
 }
 
 // FOR PIPELINES
-int pipe( int end ) {
+int pipe( pid_t send, pid_t rec ) {
     int r;
     
-    asm volatile( "mov r0, %2 \n" // assign r0 = end
+    asm volatile( "mov r0, %2 \n" // assign r0 = send
+                  "mov r1, %3 \n" // assign r1 = rec
                   "svc %1     \n" // make system call SYS_PIPE
                   "mov %0, r0 \n" // assign r0 = r
                 : "=r" (r)
-                : "I" (SYS_PIPE), "r" (end)
+                : "I" (SYS_PIPE), "r" (send), "r" (rec)
                 : "r0" );
     
     return r;
 }
 
-void writePipe( int pipeIndex, uint32_t data ) {
-      asm volatile( "mov r0, %1 \n" // assign r0 = pipeIndex
+void pipeWrite( int pipeID, uint32_t data ) {
+      asm volatile( "mov r0, %1 \n" // assign r0 = pipeID
                     "mov r1, %2 \n" // assign r1 = data
                     "svc %0     \n" // make system call SYS_WRITE_PIPE
                   :
-                  : "I" (SYS_WRITE_PIPE), "r" (pipeIndex), "r" (data)
+                  : "I" (SYS_WRITE_PIPE), "r" (pipeID), "r" (data)
                   : "r0", "r1" );
 
       return;
 }
 
-int readPipe( int start ) {
+int pipeRead( int pipeID ) {
   int r;
 
-  asm volatile( "mov r0, %2 \n" // assign r0 =  start
+  asm volatile( "mov r0, %2 \n" // assign r0 =  pipeID
                 "svc %1     \n" // make system call SYS_READ_PIPE
                 "mov %0, r0 \n" // assign r0 =    r
               : "=r" (r)
-              : "I" (SYS_READ_PIPE), "r" (start)
+              : "I" (SYS_READ_PIPE), "r" (pipeID)
               : "r0");
 
   return r;
 }
 
-void closePipe( int pipeIndex ) {
-    asm volatile( "mov r0, %1 \n" // assign r0 =  pipeIndex
+int pipeCheck( int pipeID, uint32_t data ) {
+    int r;
+    
+    asm volatile( "mov r0, %2 \n" // assign r0 =  pipeID
+                  "mov r1, %3 \n" // assign r1 =  data (check if exists)
+                  "svc %1     \n" // make system call SYS_CHECK_PIPE
+                  "mov %0, r0 \n" // assign r0 =    r
+                : "=r" (r)
+                : "I" (SYS_CHECK_PIPE), "r" (pipeID), "r" (data)
+                : "r0", "r1" );
+
+    return r;
+}
+
+void closePipe( int pipeID ) {
+    asm volatile( "mov r0, %1 \n" // assign r0 =  pipeID
                   "svc %0     \n" // make system call SYS_CLOSE_PIPE
                 :
-                : "I" (SYS_CLOSE_PIPE), "r" (pipeIndex)
+                : "I" (SYS_CLOSE_PIPE), "r" (pipeID)
                 : "r0" );
 
     return;
+}
+
+int getProcessID() {
+    int r;
+
+    asm volatile( "svc %1     \n" // make svc call SYS_GET_ID
+                  "mov %0, r0 \n" // assign r = r0
+                : "=r" (r)
+                : "I" (SYS_GET_ID)
+                : "r0" );
+
+    return r;
+}
+
+void writePipe( int pipeID, uint32_t data ) {
+    pipeWrite( pipeID, data);
+    yield();        // SYS call to yield
+    
+    int exists = 0;
+    while ( exists == 0 ) {
+        exists = pipeCheck( pipeID, data );   // to prevent overwriting
+        
+        if ( exists == 0 )
+            yield();     // call next process if there is no overwriting
+    }
+}
+
+int readPipe( int pipeID ) {
+
+    int exists = -1;
+    while ( exists == -1 ) {
+        exists = pipeRead( pipeID );   // to prevent overwriting
+        
+        if ( exists == -1 )
+            yield();     // call next process if there is no overwriting
+    }
+    return exists;
 }
  
 

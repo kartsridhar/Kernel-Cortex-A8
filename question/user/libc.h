@@ -44,6 +44,9 @@ typedef int pid_t;
 #define SYS_WRITE_PIPE  ( 0x09 )  
 #define SYS_READ_PIPE   ( 0x10 )
 #define SYS_CLOSE_PIPE  ( 0x11 )
+#define SYS_CHECK_PIPE  ( 0x12 )
+
+#define SYS_GET_ID      ( 0x13 )
 
 #define SIG_TERM       ( 0x00 )
 #define SIG_QUIT       ( 0x01 )
@@ -81,17 +84,23 @@ extern int  kill( pid_t pid, int x );
 extern void nice( pid_t pid, int x );
 
 // FOR PIPELINES
-// allocate pipe, initialise new pipe between current pipe and pipeIndex
-extern int pipe( int end );
+
+int getProcessID();   // get the current process' id
+int pipeRead( int pipeID );
+void pipeWrite( int pipeID, uint32_t data );
+int pipeCheck( int pipeID, uint32_t data );
+
+// allocate pipe, initialise new pipe between sending process and receiving process
+extern int pipe( pid_t send, pid_t rec );
 
 // write data to pipe, block if needed
-extern void writePipe( int pipeIndex, uint32_t data );
+extern void writePipe( int pipeID, uint32_t data );
 
 // read data from pipe, block if needed
-extern int readPipe( int start );
+extern int readPipe( int pipeID );
 
 // close pipe 
-extern void closePipe( int pipeIndex );
+extern void closePipe( int pipeID );
 
 #endif
 

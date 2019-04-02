@@ -53,11 +53,11 @@ typedef struct {
 typedef struct {
     pid_t pipeID;
     status_t status;
-    bool isAvailable;
-    int start;       // opening end
-    int end;         // closing end
+    pid_t send;       // sending end PID
+    pid_t rec;         // receiving end PID
     uint32_t data;   //pipe contents
 } pipe_t;
 
 #endif
+
 

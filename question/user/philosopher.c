@@ -1,22 +1,28 @@
 #include "philosopher.h"
 
-#define PHILS 16
-
-// action => defining the action the philosopher must perform
-
 void main_philosopher() {
-    int action = 0;
-    while( 1 ) {
-        action = readPipe( 2 );   
+    int currPID = getProcessID();
+    int philID = currPID - 3;      // console = 0, waiter = 1
+    
+    int eat;
+    while ( 1 ) {
+        eat = readPipe( philID );   // get philID
+        
+        write(STDOUT_FILENO, " PHILOSOPHER ", 13 );
         
         char* str = "  ";
-        itoa(str, action);
+        itoa( str, philID + 1 );
         
-        if(action == 2) write( STDOUT_FILENO, " THINKING ", 10 );
-        if(action == 1) write( STDOUT_FILENO, " EATING ", 8 );
-        yield();
+        write(STDOUT_FILENO, str, 2);  // writing out the philosopherID
+        
+        if ( eat == true ) {
+            write( STDOUT_FILENO, " EATING \n", 10 );
+        }
+        else {
+            write( STDOUT_FILENO, " THINKING \n", 12 );
+        }
     }
-    exit(EXIT_SUCCESS);
+    exit( EXIT_SUCCESS );
 }
 
 

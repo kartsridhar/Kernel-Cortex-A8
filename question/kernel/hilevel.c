@@ -327,7 +327,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             break; 
         }    
         
-        case 0x08 : { // 0x08 => pipe( int end )
+        case 0x08 : { // 0x08 => pipe( pid_t send, pid_t rec )
             
 //             pprint("CREATING_PIPE");
             
@@ -339,71 +339,47 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             // Initiliasing a new pipe
             pipes[ availablePipeIndex ].pipeID = availablePipeIndex;
             pipes[ availablePipeIndex ].status = STATUS_READY;
-            pipes[ availablePipeIndex ].start = current->pid;
-            pipes[ availablePipeIndex ].end = ctx->gpr[ 0 ];
+            pipes[ availablePipeIndex ].send = ( pid_t ) ctx->gpr[ 0 ];
+            pipes[ availablePipeIndex ].rec = ( pid_t ) ctx->gpr[ 1 ];
+            pipes[ availablePipeIndex ].data = -1;
             
             // Returning the pipeID
             ctx->gpr[ 0 ] = pipes[ availablePipeIndex ].pipeID;
             break;
         }
             
-        case 0x09 : { // 0x09 => writePipe( int pipeIndex, uint32_t data )
+        case 0x09 : { // 0x09 => writePipe( int pipeID, uint32_t data )
             
 //             pprint("WRITING");
             
             // Getting the pipe ID from ctx
             pid_t id = ctx->gpr[ 0 ];
+            uint32_t data = ctx->gpr[ 1 ];
             
             // Getting the index of the pipe ID received 
             int get = getPipeIndex( id );
-            
-            // Updating pipe data with ctx passed in
-            pipes[ get ].data = ctx->gpr[ 2 ];
+
+            pipes[ get ].data = data;
             
             break;
         }
             
-        case 0x10 : { // 0x10 => readPipe( int start )
+        case 0x10 : { // 0x10 => readPipe( int pipeID )
            
 //             pprint("READING");
             
             // Getting the pipe ID from ctx
             pid_t id = ctx->gpr[ 0 ];
+            ctx->gpr[ 0 ] = -1;  //resetting
             
-            for ( int i = 0; i < PIPES; i++ ) {
-                /* case 1: pipe creator attempting to read 
-                 * case 2: pipe receiver attempting to read
-                 * */
-                
-                // 1.
-                if ( current->pid == pipes[ i ].start 
-                   && id == pipes[ i ].end )
-                {
-                    if ( pipes[ i ].status != STATUS_TERMINATED )
-                    {
-                        int data = pipes[ i ].data;
-                        ctx->gpr[ 0 ] = pipes[ i ].data;
-                        break;
-                    }
-                }
-                
-                // 2.
-                if ( current->pid == pipes[ i ].end 
-                   && id == pipes[ i ].start )
-                {
-                    if ( pipes[ i ].status != STATUS_TERMINATED )
-                    {
-                        int data = pipes[ i ].data;
-                        ctx->gpr[ 0 ] = pipes[ i ].data;
-                        break;
-                    }
-                }
-                else
-                    ctx->gpr[ 0 ] = -1;
-            }
+            int get = getPipeIndex( id );
+            ctx->gpr[ 0 ] = pipes[ get ].data;
+            
+            pipes[ get ].data = -1;
+            
             break;
         }
-        case 0x11 : { // 0x11 => closePipe( int pipeIndex )
+        case 0x11 : { // 0x11 => closePipe( int pipeID )
            
 //             pprint("CLOSING");
             
@@ -412,15 +388,26 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             
             int get = getPipeIndex( id );
             
-            // Setting everything in the stack of that pipe to 0
-            memset( &pipes[ get ], 0, sizeof( pipe_t ) );
-
             pipes[ get ].status = STATUS_TERMINATED;
+            noOfPipes -= 1;
+            break;
+        }
+            
+        case 0x12 : { // 0x12 => pipeCheck( int pipeID, uint32_t data)
+            pid_t id = ctx->gpr[ 0 ];
+            uint32_t check = ctx->gpr[ 1 ];
+            
+            ctx->gpr[ 0 ] = 0;
+            
+            int get = getPipeIndex( id );
+            
+            ctx->gpr[ 0 ] = pipes[ get ].data;
+            pipes[ get ].data = -1;
             
             break;
         }
-        
-        case 0x12 : { // 0x12 => getProcessID()
+            
+        case 0x13 : { //0x13 => getProcessID()
             ctx->gpr[ 0 ] = current->pid;
             break;
         }
