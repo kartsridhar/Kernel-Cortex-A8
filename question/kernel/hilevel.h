@@ -29,25 +29,25 @@
 typedef int pid_t;
 
 typedef enum { 
-  STATUS_CREATED,
-  STATUS_READY,
-  STATUS_EXECUTING,
-  STATUS_WAITING,
-  STATUS_TERMINATED
+    STATUS_CREATED,
+    STATUS_READY,
+    STATUS_EXECUTING,
+    STATUS_WAITING,
+    STATUS_TERMINATED
 } status_t;
 
 typedef struct {
-  uint32_t cpsr, pc, gpr[ 13 ], sp, lr;
+    uint32_t cpsr, pc, gpr[ 13 ], sp, lr;
 } ctx_t;
 
 typedef struct {
-           pid_t    pid;         // process identifier
-        status_t status;
-           ctx_t    ctx;
-       bool isAvailable;
-         pid_t priority;
- pid_t changed_priority;
-      pid_t incPriority;        // increase priority by this val
+    pid_t    pid;         // process identifier
+    status_t status;
+    ctx_t    ctx;
+    bool isAvailable;
+    pid_t priority;
+    pid_t changed_priority;
+    pid_t incPriority;        // increase priority by this val
 } pcb_t;
 
 typedef struct {

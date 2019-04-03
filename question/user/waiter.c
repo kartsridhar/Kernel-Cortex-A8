@@ -3,7 +3,6 @@
  * a philosopher must ask permission of the waiter.
  * The waiter gives permission to only one philosopher at a time
  * until the philosopher has picked up both of their forks.
- * Putting down a fork is always allowed.
  *
  * IMPLEMENTING THE WAITER AS A MUTEX
  *
@@ -26,19 +25,20 @@ int pipeIDS[ PHILS ];
 int philIDS[ PHILS ];
 
 void main_waiter() {
-    pid_t currPID = getProcessID();
+    pid_t currPID = getProcessID();     // get current process ID
     
     // 1.
     for ( int i = 0; i < PHILS; i++ ) {
         philIDS[ i ] = fork();       // fork a child process for each philosopher
-        pipeIDS[ i ] = pipe( currPID, philIDS[ i ] );
+        pipeIDS[ i ] = pipe( currPID, philIDS[ i ] );      // create a pipe from current process
+                                                           // to every philID
         
         if ( 0 == philIDS[ i ] )
             exec( &main_philosopher );
     }
     
     // 2. 
-    int eating = 0;
+    int eating = 0;                                        
     while ( 1 ) {
         for ( int i = 0; i < PHILS; i++ ) {
             if ( i == eating )

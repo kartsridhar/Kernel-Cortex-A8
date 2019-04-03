@@ -15,11 +15,11 @@ void main_philosopher() {
         
         write(STDOUT_FILENO, str, 2);  // writing out the philosopherID
         
-        if ( eat == true ) {
-            write( STDOUT_FILENO, " EATING \n", 10 );
+        if ( eat ) {
+            write( STDOUT_FILENO, " IS EATING \n", 13 );
         }
         else {
-            write( STDOUT_FILENO, " THINKING \n", 12 );
+            write( STDOUT_FILENO, " IS THINKING \n", 15 );
         }
     }
     exit( EXIT_SUCCESS );

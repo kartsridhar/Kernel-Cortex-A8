@@ -7,7 +7,7 @@
 
 #include "hilevel.h"
 
-#define PROCESSES 10               // max number of processes
+#define PROCESSES 16               // max number of processes
 #define SIZE_OF_STACK 0x00001000   // defining the size of stack
 #define PIPES 32                   // max number of pipes
 
@@ -393,21 +393,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             break;
         }
             
-        case 0x12 : { // 0x12 => pipeCheck( int pipeID, uint32_t data)
-            pid_t id = ctx->gpr[ 0 ];
-            uint32_t check = ctx->gpr[ 1 ];
-            
-            ctx->gpr[ 0 ] = 0;
-            
-            int get = getPipeIndex( id );
-            
-            ctx->gpr[ 0 ] = pipes[ get ].data;
-            pipes[ get ].data = -1;
-            
-            break;
-        }
-            
-        case 0x13 : { //0x13 => getProcessID()
+        case 0x12 : { //0x12 => getProcessID()
             ctx->gpr[ 0 ] = current->pid;
             break;
         }

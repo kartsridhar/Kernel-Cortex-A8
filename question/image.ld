@@ -26,7 +26,8 @@ SECTIONS {
   .       = . + 0x00001000;
   tos_console = .;
   /* allocate stack for USR mode     */
-  .       = . + 0x00057000;
+  .       = . + (0x00001000 * 32);
   tos_USR = .;
 }
+
 
