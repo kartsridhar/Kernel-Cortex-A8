@@ -1,7 +1,7 @@
 /* Copyright (C) 2017 Daniel Page <csdsp@bristol.ac.uk>
  *
- * Use of this source code is restricted per the CC BY-NC-ND license, a copy of 
- * which can be found via http://creativecommons.org (and should be included as 
+ * Use of this source code is restricted per the CC BY-NC-ND license, a copy of
+ * which can be found via http://creativecommons.org (and should be included as
  * LICENSE.txt within the associated archive or repository).
  */
 
@@ -13,6 +13,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#include <stdlib.h>
 
 #include <string.h>
 // Include functionality relating to the platform.
@@ -28,7 +30,7 @@
 
 typedef int pid_t;
 
-typedef enum { 
+typedef enum {
     STATUS_CREATED,
     STATUS_READY,
     STATUS_EXECUTING,
@@ -59,5 +61,3 @@ typedef struct {
 } pipe_t;
 
 #endif
-
-

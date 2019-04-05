@@ -26,19 +26,19 @@ int philIDS[ PHILS ];
 
 void main_waiter() {
     pid_t currPID = getProcessID();     // get current process ID
-    
+
     // 1.
     for ( int i = 0; i < PHILS; i++ ) {
         philIDS[ i ] = fork();       // fork a child process for each philosopher
         pipeIDS[ i ] = pipe( currPID, philIDS[ i ] );      // create a pipe from current process
                                                            // to every philID
-        
+
         if ( 0 == philIDS[ i ] )
             exec( &main_philosopher );
     }
-    
-    // 2. 
-    int eating = 0;                                        
+
+    // 2.
+    int eating = 0;
     while ( 1 ) {
         for ( int i = 0; i < PHILS; i++ ) {
             if ( i == eating )
@@ -51,5 +51,3 @@ void main_waiter() {
     }
     exit( EXIT_SUCCESS );
 }
-
-
