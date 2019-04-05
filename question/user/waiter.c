@@ -38,16 +38,19 @@ void main_waiter() {
     }
 
     // 2.
-    int eating = 0;
+    int count = 0;
     while ( 1 ) {
         for ( int i = 0; i < PHILS; i++ ) {
-            if ( i == eating )
-                writePipe( i, EAT );
-            else
-                writePipe( i, THINK );
+            if ( count%2 == 0 ) {
+                if ( i%2 == 0 ) writePipe( i, EAT );
+                else writePipe( i, THINK );
+            }
+            else {
+                if ( i%2 != 0 ) writePipe( i, EAT );
+                else writePipe( i, THINK );
+            }
         }
-        // 3.
-        eating = ( eating + 1 ) % PHILS;
+        count = ( count + 1 ) % PHILS;
     }
     exit( EXIT_SUCCESS );
 }

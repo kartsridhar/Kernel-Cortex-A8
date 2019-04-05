@@ -323,6 +323,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
             // Simply terminating the process
             current->status = STATUS_TERMINATED;
+            prioritySchedule(ctx);
 			      break;
 		    }
 

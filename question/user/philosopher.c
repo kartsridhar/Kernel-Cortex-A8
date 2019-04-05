@@ -2,7 +2,8 @@
 
 void main_philosopher() {
     int currPID = getProcessID();
-    int philID = currPID - 3;      // console = 0, waiter = 1
+    // int philID = currPID - 3;      // console = 0, waiter = 1
+    int philID = currPID - 2;      // console = 0, waiter = 1
 
     int eat;
     while ( 1 ) {
