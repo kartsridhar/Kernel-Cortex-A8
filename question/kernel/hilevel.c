@@ -16,8 +16,6 @@ pcb_t* current = NULL;
 int noOfPCB = 0;                   // number of processes existing
 int availableSpaceIndex;           // to store the index of the next available space
 
-int priorities[ PROCESSES ];       // to store the init priorities of each pcb
-
 pipe_t pipes[ PIPES ];
 int noOfPipes = 0;
 
@@ -55,20 +53,6 @@ int getPipeIndex( pid_t id ) {
     }
     return -1;
 }
-
-// // Function to assign priority for console
-// int assignPriorityConsole() {
-//     priorities[ 0 ] = 20;
-//     return priorities[ 0 ];
-// }
-//
-// // Function to assign a random priority value to each process
-// void assignPriority() {
-//     for ( int i = 1; i < noOfPCB; i++ ) {
-//         int p = rand() % 18;               // 20 for console, want to keep it even
-//         priorities[ i ] = p;
-//     }
-// }
 
 // Function to choose the process with highest priority
 // Priority = initial priority + the change in priority
@@ -127,11 +111,10 @@ void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
     return;
 }
 
-/* Scheduler function (algorithm). Currently special purpose for 3 user
-programs. It checks which process is active, and performs a context
-switch to suspend it and resume the next one in a simple round-robin
+/* Schedule(ctx). It checks which process is active, and performs a context
+switch to suspend it and resume the next one in a priority
 scheduling. 'memcpy' is used to copy the associated execution contexts
-into place, before updating 'current' to refelct new active PCB.
+into place, before updating 'current' to reflect new active PCB.
 */
 
 void roundRobinSchedule( ctx_t* ctx ) {
@@ -160,10 +143,8 @@ void prioritySchedule( ctx_t* ctx ) {
     return;
 }
 
-extern void main_console();
-extern void main_philosopher();
-extern void main_waiter();
-extern uint32_t tos_console;
+extern void main_shell();
+extern uint32_t tos_shell;
 extern uint32_t tos_USR;          // for user programs
 
 //-------------------------------------------------------------------------------
@@ -171,18 +152,18 @@ extern uint32_t tos_USR;          // for user programs
 void hilevel_handler_rst( ctx_t* ctx ) {
 
     // Configuring the timer interrupt (from lab-4_q)
-	TIMER0->Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
-	TIMER0->Timer1Ctrl  = 0x00000002; // select 32-bit   timer
-	TIMER0->Timer1Ctrl |= 0x00000040; // select periodic timer
-	TIMER0->Timer1Ctrl |= 0x00000020; // enable          timer interrupt
-	TIMER0->Timer1Ctrl |= 0x00000080; // enable          timer
+    TIMER0->Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
+    TIMER0->Timer1Ctrl  = 0x00000002; // select 32-bit   timer
+    TIMER0->Timer1Ctrl |= 0x00000040; // select periodic timer
+    TIMER0->Timer1Ctrl |= 0x00000020; // enable          timer interrupt
+    TIMER0->Timer1Ctrl |= 0x00000080; // enable          timer
 
-	GICC0->PMR          = 0x000000F0; // unmask all            interrupts
-	GICD0->ISENABLER1  |= 0x00000010; // enable timer          interrupt
-	GICC0->CTLR         = 0x00000001; // enable GIC interface
-	GICD0->CTLR         = 0x00000001; // enable GIC distributor
+    GICC0->PMR          = 0x000000F0; // unmask all            interrupts
+    GICD0->ISENABLER1  |= 0x00000010; // enable timer          interrupt
+    GICC0->CTLR         = 0x00000001; // enable GIC interface
+    GICD0->CTLR         = 0x00000001; // enable GIC distributor
 
-    pprint("RESET");
+    // pprint("RESET");
 
     // Setting all processes in N to available
     for ( int i = 0; i < PROCESSES; i++ ){
@@ -190,31 +171,29 @@ void hilevel_handler_rst( ctx_t* ctx ) {
     }
 
     // Setting all pipes in PIPES to available
-    for ( int i = 0; i < PIPES; i++ ) {
-        pipes[ i ].status = STATUS_TERMINATED;
+    for ( int j = 0; j < PIPES; j++ ) {
+        pipes[ j ].status = STATUS_TERMINATED;
     }
 
-	memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise the console
-	pcb[ 0 ].pid      = 0;
-	pcb[ 0 ].status   = STATUS_CREATED;
-	pcb[ 0 ].ctx.cpsr = 0x50;                    // processor is switched into USR mode
-	pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_console );
-	pcb[ 0 ].ctx.sp   = ( uint32_t )( &tos_console );
-  pcb[ 0 ].isAvailable = false;                // setting the process space to be unavailable
-	pcb[ 0 ].priority = 20;
-	pcb[ 0 ].changed_priority = 20;
- 	// pcb[ 0 ].priority = assignPriorityConsole();
-	// pcb[ 0 ].changed_priority = assignPriorityConsole();
-	pcb[ 0 ].incPriority = 3;
+    memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise the console
+    pcb[ 0 ].pid      = 0;
+    pcb[ 0 ].status   = STATUS_CREATED;
+    pcb[ 0 ].ctx.cpsr = 0x50;                    // processor is switched into USR mode
+    pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_shell );
+    pcb[ 0 ].ctx.sp   = ( uint32_t )( &tos_shell );
+    pcb[ 0 ].isAvailable = false;                // setting the process space to be unavailable
+    pcb[ 0 ].priority = 20;
+    pcb[ 0 ].changed_priority = 20;
+    pcb[ 0 ].incPriority = 3;
 
     noOfPCB += 1;                                // increasing the process count by 1
 
-	dispatch( ctx, NULL, &pcb[ 0 ] );
+    dispatch( ctx, NULL, &pcb[ 0 ] );
 
-	// Enabling the IRQ interrupt
-	int_enable_irq();
+    // Enabling the IRQ interrupt
+    int_enable_irq();
 
-	return;
+    return;
 }
 
 // From lab-4_q
@@ -275,7 +254,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
 		    case 0x03 : { // 0x03 => fork()
 
-            pprint("FORK");
+            // pprint("FORK");
 
             noOfPCB += 1;
             availableSpaceIndex = getAvailableSpace();
@@ -292,8 +271,6 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             pcb[ availableSpaceIndex ].isAvailable   = false;
             pcb[ availableSpaceIndex ].priority = ( availableSpaceIndex * 3 );
             pcb[ availableSpaceIndex ].changed_priority = ( availableSpaceIndex * 3 );
-            // pcb[ availableSpaceIndex ].priority = priorities[ availableSpaceIndex ];
-            // pcb[ availableSpaceIndex ].changed_priority = priorities[ availableSpaceIndex ];
             pcb[ availableSpaceIndex ].incPriority = 2;
 
             // Storing the stack pointer of the current process
@@ -319,27 +296,28 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
 		    case 0x04 : { // 0x04 => exit()
 
-            pprint("EXIT");
+            // pprint("EXIT");
 
             // Simply terminating the process
             current->status = STATUS_TERMINATED;
+            current->isAvailable = true;
             prioritySchedule(ctx);
 			      break;
 		    }
 
         case 0x05 : { // 0x05 => exec()
 
-            pprint("EXEC");
+            // pprint("EXEC");
 
             ctx->pc = ( uint32_t ) ctx->gpr[ 0 ];          // loading the address from fork
-            ctx->sp = ( uint32_t ) ( &tos_console + ( ( availableSpaceIndex ) * SIZE_OF_STACK ));
+            ctx->sp = ( uint32_t ) ( &tos_shell + ( ( availableSpaceIndex ) * SIZE_OF_STACK ));
             prioritySchedule( ctx );
 		      	break;
 		    }
 
         case 0x06 : { // 0x06 => kill()
 
-            pprint("KILL");
+            // pprint("KILL");
 
             uint32_t kill = ( uint32_t ) ( ctx->gpr[ 0 ] );
             noOfPCB -= 1;

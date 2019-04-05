@@ -17,8 +17,8 @@
 extern void main_philosopher();
 
 /* 1. Init child processes and pipes for every philosopher
- * 2. Choose any random philosopher to eat first, make the rest think
- * 3. Mod over the phils and keep changing
+ * 2. Choose even philosophers to eat first, then switch with odd
+ * 3. increase the count
  * */
 
 int pipeIDS[ PHILS ];
@@ -29,7 +29,7 @@ void main_waiter() {
 
     // 1.
     for ( int i = 0; i < PHILS; i++ ) {
-        philIDS[ i ] = fork();       // fork a child process for each philosopher
+        philIDS[ i ] = fork();                             // fork a child process for each philosopher
         pipeIDS[ i ] = pipe( currPID, philIDS[ i ] );      // create a pipe from current process
                                                            // to every philID
 
@@ -41,15 +41,16 @@ void main_waiter() {
     int count = 0;
     while ( 1 ) {
         for ( int i = 0; i < PHILS; i++ ) {
-            if ( count%2 == 0 ) {
-                if ( i%2 == 0 ) writePipe( i, EAT );
-                else writePipe( i, THINK );
+            if ( count%2 == 0 ) {                         // checking if round is even
+                if ( i%2 == 0 ) writePipe( i, EAT );      // making even philosophers eat
+                else writePipe( i, THINK );               // making odd philosophers think
             }
-            else {
-                if ( i%2 != 0 ) writePipe( i, EAT );
-                else writePipe( i, THINK );
+            else {                                        // checking if round is odd
+                if ( i%2 != 0 ) writePipe( i, EAT );      // making odd philosophers eat
+                else writePipe( i, THINK );               // making even philosophers think
             }
         }
+        // 3.
         count = ( count + 1 ) % PHILS;
     }
     exit( EXIT_SUCCESS );
