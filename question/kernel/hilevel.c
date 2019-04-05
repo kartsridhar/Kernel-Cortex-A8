@@ -7,14 +7,16 @@
 
 #include "hilevel.h"
 
-#define PROCESSES 16               // max number of processes
+#define PROCESSES 20               // max number of processes
 #define SIZE_OF_STACK 0x00001000   // defining the size of stack
-#define PIPES 32                   // max number of pipes
+#define PIPES 60                   // max number of pipes
 
 pcb_t pcb[ PROCESSES ]; 
 pcb_t* current = NULL;
 int noOfPCB = 0;                   // number of processes existing
 int availableSpaceIndex;           // to store the index of the next available space
+
+int priorities[ PROCESSES ];       // to store the init priorities of each pcb 
 
 pipe_t pipes[ PIPES ];
 int noOfPipes = 0;
@@ -52,6 +54,20 @@ int getPipeIndex( pid_t id ) {
             return i;
     }
     return -1;
+}
+
+// Function to assign priority for console
+int assignPriorityConsole() {
+    priorities[ 0 ] = 20;
+    return priorities[ 0 ];
+}
+
+// Function to assign a random priority value to each process
+void assignPriority() {
+    for ( int i = 1; i < noOfPCB; i++ ) {
+        int p = rand() % 18;               // 20 for console, want to keep it even
+        priorities[ i ] = p;
+    }
 }
 
 // Function to choose the process with highest priority
@@ -187,6 +203,8 @@ void hilevel_handler_rst( ctx_t* ctx ) {
     pcb[ 0 ].isAvailable = false;                // setting the process space to be unavailable
 	pcb[ 0 ].priority = 20;
 	pcb[ 0 ].changed_priority = 20;
+// 	// 	pcb[ 0 ].priority = assignPriorityConsole();
+// 	pcb[ 0 ].changed_priority = assignPriorityConsole();
 	pcb[ 0 ].incPriority = 3;
 
     noOfPCB += 1;                                // increasing the process count by 1
@@ -232,7 +250,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
    */
     switch( id ) {
         case 0x00 : { // 0x00 => yield() = timer forcibly transfer the control to another process. 
-// 			schedule( ctx );
+            prioritySchedule( ctx );
             break;
         }
 
@@ -273,6 +291,8 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             pcb[ availableSpaceIndex ].isAvailable   = false;
             pcb[ availableSpaceIndex ].priority = ( availableSpaceIndex * 3 );
             pcb[ availableSpaceIndex ].changed_priority = ( availableSpaceIndex * 3 );
+//             pcb[ availableSpaceIndex ].priority = priorities[ availableSpaceIndex ];
+//             pcb[ availableSpaceIndex ].changed_priority = priorities[ availableSpaceIndex ];
             pcb[ availableSpaceIndex ].incPriority = 2;    
             
             // Storing the stack pointer of the current process 

@@ -10,7 +10,7 @@
 
 #include "waiter.h"
 
-#define PHILS 4
+#define PHILS 16
 #define EAT 1
 #define THINK 0
 
