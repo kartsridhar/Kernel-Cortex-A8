@@ -1,6 +1,6 @@
 # University of Bristol - Concurrent Computing
 * Above is a kernel I developed for Cortex-A8 emulated by QEMU (download it [here](https://www.qemu.org/) ). The skeleton was provided by the University
-* Most of it is written in C and Assembly. The core stuff of the kernel can be found in [hilevel.c](https://github.com/kartsridhar/CC-Kernel/blob/master/question/kernel/hilevel.c)
+* Most of it is written in C and Assembly. The core stuff of the kernel can be found in [hilevel.c](https://github.com/kartsridhar/Kernel-Cortex-A8/blob/master/question/kernel/hilevel.c)
 
 ### Features
 * Dynamic creation and termination of user programs. For example: P3, P4, P5 and 2B
